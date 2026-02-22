@@ -24,11 +24,9 @@
         table { width: 100%; border-collapse: collapse; margin-top: 15px; background: white; font-size: 14px; }
         th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
         th { background: var(--dark); color: var(--gold); }
-        .row-highlight { background-color: #e2e8f0 !important; font-weight: bold; }
         
         .bid-btn { background: var(--gold); color: var(--dark); border: none; padding: 15px; font-size: 20px; font-weight: bold; border-radius: 8px; cursor: pointer; width: 100%; margin-bottom: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.2);}
-        .pass-btn { background: var(--danger); color: white; border: none; padding: 15px; font-size: 18px; font-weight: bold; border-radius: 8px; cursor: pointer; width: 100%; box-shadow: 0 4px 6px rgba(0,0,0,0.2);}
-        .bid-btn:disabled, .pass-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+        .bid-btn:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
         
         .badge { padding: 4px 8px; border-radius: 4px; font-size: 12px; color: white; font-weight: bold; }
         .WK { background: #e63946; } .Batter { background: #457b9d; } .Bowler { background: #1d3557; } .AR { background: #fb8500; }
@@ -56,7 +54,8 @@
     <div class="card" style="max-width: 500px; margin: auto;">
         <h2>Create Auction Room</h2>
         <input type="text" id="rName" placeholder="Room Name (e.g. IPL 2026)">
-        <input type="password" id="rPass" placeholder="Set Room Password (For everyone)">
+        <input type="password" id="rPass" placeholder="Set Room Password (For Normal Teams)">
+        <input type="password" id="rAdminPass" placeholder="Set ADMIN Password (For Admin Re-login)">
         <button onclick="createRoom()" style="background:var(--success); color:white; border:none; padding:15px; border-radius:5px; width:100%; font-size: 18px; font-weight:bold; margin-bottom:10px;">Create Room</button>
         <button onclick="showPage('mainMenuPage')" style="background:#ccc; padding:10px; width:100%; border:none; border-radius:5px;">Back</button>
     </div>
@@ -119,12 +118,10 @@
             <div class="admin-only" style="background: #e2e8f0; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
                 <h3 style="margin-top:0;">Admin Control</h3>
                 <select id="selectFromMaster" onchange="loadPlayerToAuction()"></select>
-                
                 <div style="display:flex; gap:10px; margin-top:15px;">
-                    <button id="adminBtnSold" onclick="autoSellPlayer()" style="background: var(--success); color: white; padding: 15px; border: none; border-radius: 5px; flex:1; font-weight:bold; font-size:16px; display:none;">✅ SOLD (To Highest)</button>
-                    <button id="adminBtnUnsold" onclick="markUnsold()" style="background: var(--danger); color: white; padding: 15px; border: none; border-radius: 5px; flex:1; font-weight:bold; font-size:16px; display:none;">❌ UNSOLD</button>
+                    <button id="adminBtnSold" onclick="autoSellPlayer()" style="background: var(--success); color: white; padding: 15px; border: none; border-radius: 5px; flex:1; font-weight:bold; font-size:16px; display:none;">✅ Force SELL</button>
+                    <button id="adminBtnUnsold" onclick="markUnsold()" style="background: var(--danger); color: white; padding: 15px; border: none; border-radius: 5px; flex:1; font-weight:bold; font-size:16px;">❌ UNSOLD</button>
                 </div>
-                <p id="adminWaitMsg" style="color:var(--danger); font-weight:bold;">सर्व टीम्सनी 'PASS' केल्याशिवाय बटण दिसणार नाही...</p>
             </div>
 
             <div id="auctionDisplay" style="background: var(--dark); color: var(--gold); padding: 30px 10px; border-radius: 15px; border: 3px solid var(--gold);">
@@ -132,20 +129,15 @@
                 <p id="liveDispInfo">-</p>
                 <div style="font-size: 30px; margin-top: 15px; color: white;">Bid: <span id="currentBidLabel" style="color:var(--gold); font-weight:bold;">0.00</span> Cr</div>
                 <p style="color: #fff; font-size: 18px; margin-top: 5px;">Highest Bidder: <span id="highestBidderLabel" style="color: #4cc9f0; font-weight:bold;">None</span></p>
-            </div>
-            
-            <div style="background:#fff; padding:10px; border-radius:5px; margin-top:15px; border: 2px solid #ccc;">
-                <h4 style="margin:0 0 5px 0; color:var(--danger);">Teams Passed (यांनी माघार घेतली):</h4>
-                <p id="globalPassedTeamsList" style="margin:0; font-weight:bold; color:#555;">None</p>
+                
+                <div id="timerDisplay" style="font-size: 30px; color: #ff4d4d; font-weight: bold; margin-top: 20px; display:none; background: rgba(0,0,0,0.5); padding: 10px; border-radius: 8px;">
+                    ⏳ Waiting...
+                </div>
             </div>
 
             <div id="myBiddingSection" style="margin-top: 20px; display:none;">
                 <p style="margin-top:0; font-weight:bold; color:var(--blue);">Bidding as: <span id="biddingAsName" style="font-size:20px;">-</span></p>
-                <div style="display:flex; gap:10px; flex-direction:column;">
-                    <button id="btnPlaceBid" class="bid-btn" onclick="placeBid()">🔥 PLACE BID (+)</button>
-                    <button id="btnPassBid" class="pass-btn" onclick="passBid()">❌ PASS (No Bid)</button>
-                </div>
-                <p id="passStatusMsg" style="display:none; color:var(--danger); font-weight:bold; margin-top:10px;">तुम्ही या खेळाडूसाठी माघार घेतली आहे.</p>
+                <button id="btnPlaceBid" class="bid-btn" onclick="placeBid()">🔥 PLACE BID (+)</button>
             </div>
         </div>
     </div>
@@ -168,7 +160,9 @@
       appId: "1:353231465465:web:e4ae774ca0fb91c4ee2b28"
     };
 
-    firebase.initializeApp(firebaseConfig);
+    if (!firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+    }
     const db = firebase.database();
 
     // Session Data
@@ -179,7 +173,8 @@
 
     let teams = [];
     let masterPlayers = [];
-    let liveState = { playerId: null, price: 0, bidder: 'None', passedTeams: {} };
+    let liveState = { playerId: null, price: 0, bidder: 'None', lastBidTime: null };
+    let auctionTimerInterval;
 
     const getRef = (path) => db.ref('rooms/' + currentRoomId + '/' + path);
 
@@ -187,7 +182,6 @@
     window.onload = () => {
         if(currentRoomId && myRole) {
             startRoomListeners();
-            // If they are strictly a user without a team, they should see setup page
             if(myRole === 'user' && !myTeamId) {
                 document.getElementById('displayRoomName').innerText = "Current Room";
                 showPage('setupPage');
@@ -211,7 +205,7 @@
             let data = snap.val();
             if(data) {
                 Object.keys(data).forEach(id => {
-                    html += `<div class="room-item" onclick="joinRoomPrompt('${id}', '${data[id].config.name}', '${data[id].config.password}')">
+                    html += `<div class="room-item" onclick="joinRoomPrompt('${id}', '${data[id].config.name}', '${data[id].config.password}', '${data[id].config.adminPassword}')">
                                 <span>🏠 ${data[id].config.name}</span>
                                 <span style="font-size:12px; background:var(--dark); color:white; padding:3px 6px; border-radius:4px;">Join</span>
                              </div>`;
@@ -226,10 +220,12 @@
     function createRoom() {
         let name = document.getElementById('rName').value.trim();
         let pass = document.getElementById('rPass').value.trim();
-        if(!name || !pass) return alert("Please enter Name and Password!");
+        let adminPass = document.getElementById('rAdminPass').value.trim();
+        
+        if(!name || !pass || !adminPass) return alert("Please enter Name, User Password, and Admin Password!");
         
         let rId = "Room_" + Date.now();
-        db.ref('rooms/' + rId + '/config').set({ name: name, password: pass });
+        db.ref('rooms/' + rId + '/config').set({ name: name, password: pass, adminPassword: adminPass });
         
         localStorage.setItem('ipl_roomId', rId);
         localStorage.setItem('ipl_role', 'admin');
@@ -239,37 +235,46 @@
         document.getElementById('mainMenuPage').style.display = 'none';
         document.getElementById('displayRoomName').innerText = name;
         
-        // Show the ".admin-only" elements on setup page (like the SKIP button)
         document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'block');
         
         startRoomListeners();
-        showPage('setupPage'); // Redirect Admin to Setup Page to create their team
+        showPage('setupPage');
     }
 
-    function joinRoomPrompt(rId, rName, actualPass) {
-        let inputPass = prompt("Enter Password for Room: " + rName);
-        if(inputPass === actualPass) {
+    // 💡 JOIN ROOM PROMPT UPDATED: Checks for Admin Pass vs User Pass
+    function joinRoomPrompt(rId, rName, userPass, adminPass) {
+        let inputPass = prompt("Enter Password for Room: " + rName + "\n(If you are Admin, enter Admin Password)");
+        
+        if(inputPass === adminPass) {
+            localStorage.setItem('ipl_roomId', rId);
+            localStorage.setItem('ipl_role', 'admin');
+            currentRoomId = rId;
+            myRole = 'admin';
+            enterRoomUI(rName);
+        } else if(inputPass === userPass) {
             localStorage.setItem('ipl_roomId', rId);
             localStorage.setItem('ipl_role', 'user');
             currentRoomId = rId;
             myRole = 'user';
-            
-            document.getElementById('mainMenuPage').style.display = 'none';
-            document.getElementById('displayRoomName').innerText = rName;
-            
-            // Hide admin elements for user
-            document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
-            
-            startRoomListeners();
-            
-            if(myTeamId) {
-                setupUI();
-            } else {
-                showPage('setupPage');
-            }
+            enterRoomUI(rName);
         } else if(inputPass !== null) {
-            alert("Incorrect Room Password!");
+            alert("Incorrect Password!");
         }
+    }
+
+    function enterRoomUI(rName) {
+        document.getElementById('mainMenuPage').style.display = 'none';
+        document.getElementById('displayRoomName').innerText = rName;
+        
+        if(myRole === 'admin') {
+            document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'block');
+        } else {
+            document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
+        }
+        
+        startRoomListeners();
+        
+        if(myTeamId) { setupUI(); } else { showPage('setupPage'); }
     }
 
     function startRoomListeners() {
@@ -277,7 +282,6 @@
             teams = snap.val() ? Object.values(snap.val()) : [];
             updateTeamDropdowns();
             renderTeamSheets();
-            updateBiddingRules(); // Re-evaluate rules if team count changes
         });
 
         getRef('players').on('value', snap => {
@@ -287,9 +291,10 @@
         });
 
         getRef('liveAuction').on('value', snap => {
-            liveState = snap.val() || { playerId: null, price: 0, bidder: 'None', passedTeams: {} };
+            liveState = snap.val() || { playerId: null, price: 0, bidder: 'None', lastBidTime: null };
             updateLiveScreen();
             updateBiddingRules();
+            startLocalTimer(); // Trigger timer update
         });
     }
 
@@ -304,7 +309,6 @@
             document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
         }
         
-        // Show Bidding Section for BOTH Admin and User if they created a team
         if(myTeamId && !skipTeam) {
             document.getElementById('myBiddingSection').style.display = 'block';
             document.getElementById('biddingAsName').innerText = myTeamName;
@@ -327,7 +331,8 @@
         
         getRef('teams/' + myTeamId).set({ id: myTeamId, name: name, currentPurse: purse, password: pass, players: [] });
 
-        saveTeamLocally();
+        localStorage.setItem('ipl_teamId', myTeamId);
+        localStorage.setItem('ipl_teamName', myTeamName);
         setupUI();
     }
 
@@ -340,24 +345,18 @@
         if(team.password === pass) {
             myTeamId = team.id;
             myTeamName = team.name;
-            saveTeamLocally();
+            localStorage.setItem('ipl_teamId', myTeamId);
+            localStorage.setItem('ipl_teamName', myTeamName);
             setupUI();
         } else {
             alert("Wrong Team Password!");
         }
     }
 
-    function saveTeamLocally() {
-        localStorage.setItem('ipl_teamId', myTeamId);
-        localStorage.setItem('ipl_teamName', myTeamName);
-    }
-
     function updateTeamDropdowns() {
         let opts = '<option value="">-- Select Team --</option>';
         teams.forEach(t => opts += `<option value="${t.id}">${t.name}</option>`);
-        if(document.getElementById('existingTeamSelect')) {
-            document.getElementById('existingTeamSelect').innerHTML = opts;
-        }
+        if(document.getElementById('existingTeamSelect')) document.getElementById('existingTeamSelect').innerHTML = opts;
     }
 
     // --- MASTER DATA ---
@@ -382,7 +381,9 @@
         });
         document.getElementById('masterTbody').innerHTML = tbodyHtml;
     }
+    
     function deletePlayer(id) { if(confirm("Delete Player?")) getRef('players/' + id).remove(); }
+    
     function updateAdminPlayerSelect() {
         let mSel = document.getElementById('selectFromMaster');
         mSel.innerHTML = '<option value="">-- Select Player --</option>';
@@ -392,11 +393,12 @@
             }
         });
     }
+
     function loadPlayerToAuction() {
         let pId = document.getElementById('selectFromMaster').value;
-        if(pId === "") { getRef('liveAuction').set({ playerId: null, price: 0, bidder: 'None', passedTeams: null }); return; }
+        if(pId === "") { getRef('liveAuction').set({ playerId: null, price: 0, bidder: 'None', lastBidTime: null }); return; }
         let p = masterPlayers.find(x => x.id === pId);
-        getRef('liveAuction').set({ playerId: p.id, price: p.base, bidder: 'Base Price', passedTeams: null });
+        getRef('liveAuction').set({ playerId: p.id, price: p.base, bidder: 'Base Price', lastBidTime: null });
     }
 
     // --- LIVE AUCTION DISPLAY & LOGIC ---
@@ -414,54 +416,55 @@
             document.getElementById('liveDispInfo').innerText = "-";
             document.getElementById('currentBidLabel').innerText = "0.00";
             document.getElementById('highestBidderLabel').innerText = "None";
+            document.getElementById('timerDisplay').style.display = 'none';
         }
-
-        // Global Passed List Display
-        let passedStr = "None";
-        if(liveState.passedTeams) { passedStr = Object.values(liveState.passedTeams).join(", "); }
-        document.getElementById('globalPassedTeamsList').innerText = passedStr;
     }
 
-    // ** SUPER STRICT RULES ENGINE **
-    function updateBiddingRules() {
-        let totalTeams = teams.length;
-        let passedCount = liveState.passedTeams ? Object.keys(liveState.passedTeams).length : 0;
+    // 💡 AUTO TIMER LOGIC
+    function startLocalTimer() {
+        clearInterval(auctionTimerInterval);
         
-        // 1. User/Admin Bidding Button Restrictions
-        if(myTeamId && liveState.playerId) {
-            let btnBid = document.getElementById('btnPlaceBid');
-            let btnPass = document.getElementById('btnPassBid');
-            let msg = document.getElementById('passStatusMsg');
-            
-            if(liveState.passedTeams && liveState.passedTeams[myTeamId]) {
-                btnBid.style.display = 'none'; btnPass.style.display = 'none'; msg.style.display = 'block';
-            } else {
-                btnBid.style.display = 'block'; btnPass.style.display = 'block'; msg.style.display = 'none';
-            }
-            if(liveState.bidder === myTeamName) { btnBid.disabled = true; } else { btnBid.disabled = false; }
+        // जर प्लेयर सिलेक्ट केलेला नसेल, किंवा कोणी बिड लावली नसेल (Base Price असेल), तर टायमर बंद ठेव
+        if(!liveState.playerId || liveState.bidder === 'None' || liveState.bidder === 'Base Price' || !liveState.lastBidTime) {
+            document.getElementById('timerDisplay').style.display = 'none';
+            if(myRole === 'admin') document.getElementById('adminBtnSold').style.display = 'none';
+            return;
         }
 
-        // 2. Admin Sold/Unsold Restrictions
-        if(myRole === 'admin') {
-            let btnSold = document.getElementById('adminBtnSold');
-            let btnUnsold = document.getElementById('adminBtnUnsold');
-            let waitMsg = document.getElementById('adminWaitMsg');
-            
-            btnSold.style.display = 'none'; btnUnsold.style.display = 'none'; waitMsg.style.display = 'block';
+        if(myRole === 'admin') document.getElementById('adminBtnSold').style.display = 'block';
 
-            if(!liveState.playerId) { waitMsg.style.display = 'none'; return; }
+        auctionTimerInterval = setInterval(() => {
+            let elapsed = Date.now() - liveState.lastBidTime;
+            let timerDiv = document.getElementById('timerDisplay');
+            timerDiv.style.display = 'block';
 
-            if(liveState.bidder === 'None' || liveState.bidder === 'Base Price') {
-                if(passedCount >= totalTeams && totalTeams > 0) {
-                    btnUnsold.style.display = 'block'; waitMsg.style.display = 'none';
-                }
+            if(elapsed < 3000) {
+                // पहिले 3 सेकंद Wait
+                timerDiv.innerHTML = "⏳ Waiting... (" + Math.ceil((3000 - elapsed)/1000) + "s)";
+                timerDiv.style.color = "var(--warning)";
+            } else if (elapsed < 63000) {
+                // 3 सेकंदानंतर 60 सेकंदांचा टायमर
+                let timeLeft = Math.ceil((63000 - elapsed) / 1000);
+                timerDiv.innerHTML = "⏱️ Time Left: " + timeLeft + "s";
+                timerDiv.style.color = "#ff4d4d"; // Red
             } else {
-                if(passedCount >= totalTeams - 1 && totalTeams > 1) {
-                    btnSold.style.display = 'block'; waitMsg.style.display = 'none';
-                } else if(totalTeams === 1) {
-                    btnSold.style.display = 'block'; waitMsg.style.display = 'none';
+                // 63 सेकंद (3s + 60s) पूर्ण झाले
+                timerDiv.innerHTML = "🔨 SOLD!";
+                timerDiv.style.color = "var(--success)";
+                clearInterval(auctionTimerInterval);
+                
+                // फक्त ॲडमिनच्या सिस्टममधून Auto-sell फंक्शन कॉल होईल (डबल एंट्री टाळण्यासाठी)
+                if(myRole === 'admin') {
+                    autoSellPlayer();
                 }
             }
+        }, 200);
+    }
+
+    function updateBiddingRules() {
+        if(myTeamId && liveState.playerId) {
+            let btnBid = document.getElementById('btnPlaceBid');
+            if(liveState.bidder === myTeamName) { btnBid.disabled = true; } else { btnBid.disabled = false; }
         }
     }
 
@@ -474,17 +477,12 @@
 
         if(team.currentPurse < newPrice) return alert("Not enough budget!");
 
-        // Placing bid CLEARS everyone's 'Pass' status so they can bid again if they want
-        getRef('liveAuction').update({ price: newPrice, bidder: team.name, passedTeams: null });
-    }
-
-    function passBid() {
-        if(!myTeamId || !liveState.playerId) return;
-        getRef('liveAuction/passedTeams/' + myTeamId).set(myTeamName);
+        // जेव्हा नवीन बिड लागते, तेव्हा lastBidTime अपडेट होतो, ज्यामुळे सर्व डिव्हाइसवर टायमर परत रिसेट होतो
+        getRef('liveAuction').update({ price: newPrice, bidder: team.name, lastBidTime: Date.now() });
     }
 
     function autoSellPlayer() {
-        if(!liveState.playerId) return;
+        if(!liveState.playerId || liveState.bidder === 'Base Price') return;
         let team = teams.find(t => t.name === liveState.bidder);
         let p = masterPlayers.find(x => x.id === liveState.playerId);
         
@@ -494,15 +492,15 @@
         
         getRef('teams/' + team.id).update({ currentPurse: updatedPurse, players: playerList });
         getRef('players/' + p.id).update({ status: 'SOLD' });
-        getRef('liveAuction').set({ playerId: null, price: 0, bidder: 'SOLD to ' + team.name, passedTeams: null });
+        getRef('liveAuction').set({ playerId: null, price: 0, bidder: 'SOLD to ' + team.name, lastBidTime: null });
         
-        document.getElementById('selectFromMaster').value = "";
+        if(myRole === 'admin') document.getElementById('selectFromMaster').value = "";
     }
 
     function markUnsold() {
         if(!liveState.playerId) return;
         getRef('players/' + liveState.playerId).update({ status: 'UNSOLD' });
-        getRef('liveAuction').set({ playerId: null, price: 0, bidder: 'UNSOLD', passedTeams: null });
+        getRef('liveAuction').set({ playerId: null, price: 0, bidder: 'UNSOLD', lastBidTime: null });
         document.getElementById('selectFromMaster').value = "";
     }
 
