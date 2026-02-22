@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="mr">
+<head>
+    <meta charset="UTF-8">
+    <title>IPL Pro Auction - Data Saved</title>
+    <style>
+        :root {
+            --dark: #001d3d; --blue: #003566; --gold: #ffc300;
+            --light: #f8f9fa; --danger: #d00000; --success: #28a745;
+        }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--light); margin: 0; color: #333; }
+        .nav { background: var(--dark); padding: 15px; display: none; justify-content: center; gap: 15px; position: sticky; top: 0; z-index: 1000; }
+        .nav-btn { padding: 10px 20px; background: var(--blue); color: white; border: 1px solid var(--gold); cursor: pointer; border-radius: 5px; font-weight: bold; }
+        .nav-btn.active { background: var(--gold); color: var(--dark); }
+        .container { padding: 20px; max-width: 1200px; margin: auto; }
+        .page { display: none; }
+        .page.active { display: block; }
+        .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); margin-bottom: 25px; border-top: 5px solid var(--gold); }
+        input, select { padding: 10px; border: 1px solid #ccc; border-radius: 6px; font-size: 16px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; background: white; font-size: 14px; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background: var(--dark); color: var(--gold); }
+        .row-highlight { background-color: #e2e8f0 !important; font-weight: bold; }
+        .bid-btn { background: var(--gold); color: var(--dark); border: none; padding: 15px 30px; font-size: 20px; font-weight: bold; border-radius: 50px; cursor: pointer; }
+        .btn-del-small { background: var(--danger); color: white; border: none; padding: 2px 8px; border-radius: 4px; cursor: pointer; }
+        .badge { padding: 4px 8px; border-radius: 4px; font-size: 12px; color: white; font-weight: bold; }
+        .WK { background: #e63946; } .Batter { background: #457b9d; } .Bowler { background: #1d3557; } .AR { background: #fb8500; }
+        .reset-btn { background: #333; color: white; padding: 10px; border: none; cursor: pointer; margin-top: 50px; opacity: 0.5; }
+    </style>
+</head>
+<body>
+
+<div id="setupPage" class="page active" style="text-align:center; padding-top: 50px;">
+    <div class="card" style="max-width: 600px; margin: auto;">
+        <h1>🏏 IPL Auction (Persistent Data)</h1>
+        <p>आधी टीमची नावे सेट करा. हे एकदाच करावे लागेल.</p>
+        <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+            <input type="text" id="tName" placeholder="Team Name" style="flex:2">
+            <input type="number" id="tPurse" placeholder="Purse (Cr)" value="100" style="flex:1">
+            <button onclick="addTeam()" style="background:var(--blue); color:white; border:none; padding:10px; border-radius:5px;">+ Add Team</button>
+        </div>
+        <div id="teamPreview" style="text-align: left; margin-bottom: 20px;"></div>
+        <button class="nav-btn" style="width: 100%; padding: 15px;" onclick="finishSetup()">START SYSTEM</button>
+    </div>
+</div>
+
+<div id="mainNav" class="nav">
+    <button class="nav-btn" onclick="showPage('masterPage')">PLAYER LIST</button>
+    <button class="nav-btn active" onclick="showPage('livePage')">LIVE AUCTION</button>
+    <button class="nav-btn" onclick="showPage('dashboardPage')">TEAM SHEETS</button>
+</div>
+
+<div class="container">
+    <div id="masterPage" class="page">
+        <div class="card">
+            <h2>Master Entry</h2>
+            <div style="display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap;">
+                <input type="text" id="pName" placeholder="Player Name">
+                <select id="pRole">
+                    <option value="Batter">Batter</option>
+                    <option value="Bowler">Bowler</option>
+                    <option value="WK">WK</option>
+                    <option value="AR">All-Rounder</option>
+                </select>
+                <input type="number" id="pBase" placeholder="Base Price (Cr)">
+                <button onclick="addPlayerToMaster()" style="background:var(--blue); color:white; border:none; padding:10px 20px; border-radius:5px;">Add</button>
+            </div>
+            <table>
+                <thead><tr><th>No.</th><th>Name</th><th>Role</th><th>Base</th><th>Status</th><th>Del</th></tr></thead>
+                <tbody id="masterTbody"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="livePage" class="page">
+        <div class="card" style="text-align: center;">
+            <select id="selectFromMaster" onchange="loadPlayerToAuction()" style="width: 300px; margin-bottom: 20px;"></select>
+            <div id="auctionDisplay" style="background: var(--dark); color: var(--gold); padding: 40px; border-radius: 15px;">
+                <h1 id="liveDispName" style="font-size: 50px; margin: 0;">CHOOSE PLAYER</h1>
+                <p id="liveDispInfo">-</p>
+                <div style="font-size: 30px; margin-top: 10px;">Current Bid: <span id="currentBidLabel">0.00</span> Cr</div>
+            </div>
+            <div style="margin-top: 20px; display: flex; justify-content: center; gap: 15px; align-items: center;">
+                <select id="buyingTeam" style="height: 50px;"></select>
+                <button class="bid-btn" onclick="increaseBid()">BID (+)</button>
+                <input type="number" id="soldPrice" value="0.00" step="0.25" style="width: 120px; font-size: 20px; text-align: center;">
+            </div>
+            <div style="margin-top: 30px; display: flex; justify-content: center; gap: 20px;">
+                <button onclick="sellPlayer()" style="background: var(--success); color: white; padding: 15px 40px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;">SOLD</button>
+                <button onclick="markUnsold()" style="background: var(--danger); color: white; padding: 15px 40px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold;">UNSOLD</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="dashboardPage" class="page">
+        <div id="teamSheetsContainer" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px;"></div>
+        <center><button class="reset-btn" onclick="resetAllData()">RESET SYSTEM (Delete Everything)</button></center>
+    </div>
+</div>
+
+<script>
+    let teams = [];
+    let masterPlayers = [];
+
+    // --- SAVE & LOAD LOGIC ---
+    function saveData() {
+        localStorage.setItem('ipl_teams', JSON.stringify(teams));
+        localStorage.setItem('ipl_players', JSON.stringify(masterPlayers));
+    }
+
+    function loadData() {
+        const savedTeams = localStorage.getItem('ipl_teams');
+        const savedPlayers = localStorage.getItem('ipl_players');
+        if (savedTeams) teams = JSON.parse(savedTeams);
+        if (savedPlayers) masterPlayers = JSON.parse(savedPlayers);
+
+        if (teams.length > 0) {
+            document.getElementById('setupPage').style.display = 'none';
+            document.getElementById('mainNav').style.display = 'flex';
+            showPage('livePage');
+            updateDropdowns();
+            renderMaster();
+        }
+    }
+
+    function resetAllData() {
+        if(confirm("Sagal data delete karaycha? He parat yenar nahi!")) {
+            localStorage.clear();
+            location.reload();
+        }
+    }
+
+    // --- CORE FUNCTIONS ---
+    function showPage(id) {
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        if(id === 'dashboardPage') renderTeamSheets();
+    }
+
+    function addTeam() {
+        let name = document.getElementById('tName').value;
+        let purse = parseFloat(document.getElementById('tPurse').value);
+        if(!name) return;
+        teams.push({ name, currentPurse: purse, players: [] });
+        document.getElementById('tName').value = '';
+        document.getElementById('teamPreview').innerHTML = teams.map(t => `• ${t.name} (${t.currentPurse} Cr)`).join('<br>');
+        saveData();
+    }
+
+    function finishSetup() {
+        if(teams.length === 0) return alert("Add teams!");
+        document.getElementById('setupPage').style.display = 'none';
+        document.getElementById('mainNav').style.display = 'flex';
+        updateDropdowns();
+        showPage('livePage');
+        saveData();
+    }
+
+    function addPlayerToMaster() {
+        let name = document.getElementById('pName').value;
+        let role = document.getElementById('pRole').value;
+        let base = parseFloat(document.getElementById('pBase').value);
+        if(!name || isNaN(base)) return;
+        masterPlayers.push({ id: Date.now(), name, role, base, status: 'Available' });
+        document.getElementById('pName').value = '';
+        renderMaster();
+        updateDropdowns();
+        saveData();
+    }
+
+    function renderMaster() {
+        document.getElementById('masterTbody').innerHTML = masterPlayers.map((p, i) => `
+            <tr style="${p.status === 'SOLD' ? 'opacity:0.4' : ''}">
+                <td>${i+1}</td><td>${p.name}</td><td><span class="badge ${p.role}">${p.role}</span></td>
+                <td>${p.base}</td><td>${p.status}</td>
+                <td><button onclick="masterPlayers.splice(${i},1);renderMaster();updateDropdowns();saveData()">Del</button></td>
+            </tr>
+        `).join('');
+    }
+
+    function updateDropdowns() {
+        let mSel = document.getElementById('selectFromMaster');
+        mSel.innerHTML = '<option value="">-- Select Player --</option>';
+        masterPlayers.forEach((p, i) => {
+            if(p.status === 'Available' || p.status === 'UNSOLD') {
+                mSel.innerHTML += `<option value="${i}">${p.name} ${p.status === 'UNSOLD' ? '(UNSOLD)' : ''}</option>`;
+            }
+        });
+        document.getElementById('buyingTeam').innerHTML = teams.map(t => `<option value="${t.name}">${t.name}</option>`).join('');
+    }
+
+    function loadPlayerToAuction() {
+        let idx = document.getElementById('selectFromMaster').value;
+        if(idx === "") return;
+        let p = masterPlayers[idx];
+        document.getElementById('liveDispName').innerText = p.name;
+        document.getElementById('liveDispInfo').innerText = p.role + " | Base: " + p.base + " Cr";
+        document.getElementById('soldPrice').value = p.base;
+        document.getElementById('currentBidLabel').innerText = p.base.toFixed(2);
+    }
+
+    function increaseBid() {
+        let val = parseFloat(document.getElementById('soldPrice').value);
+        let inc = (val >= 20) ? 1.0 : (val >= 10 ? 0.5 : 0.25);
+        let newVal = val + inc;
+        document.getElementById('soldPrice').value = newVal.toFixed(2);
+        document.getElementById('currentBidLabel').innerText = newVal.toFixed(2);
+    }
+
+    function sellPlayer() {
+        let idx = document.getElementById('selectFromMaster').value;
+        let tName = document.getElementById('buyingTeam').value;
+        let price = parseFloat(document.getElementById('soldPrice').value);
+        if(idx === "") return;
+
+        let team = teams.find(t => t.name === tName);
+        if(team.currentPurse < price) return alert("No Budget!");
+
+        team.currentPurse -= price;
+        team.players.push({ id: masterPlayers[idx].id, name: masterPlayers[idx].name, role: masterPlayers[idx].role, price: price });
+        masterPlayers[idx].status = 'SOLD';
+
+        updateDropdowns();
+        document.getElementById('liveDispName').innerText = "CHOOSE PLAYER";
+        alert("Sold!");
+        saveData();
+    }
+
+    function markUnsold() {
+        let idx = document.getElementById('selectFromMaster').value;
+        if(idx !== "") { masterPlayers[idx].status = 'UNSOLD'; updateDropdowns(); saveData(); alert("Unsold"); }
+    }
+
+    function removePlayerFromTeam(teamName, playerIdxInTeam) {
+        let team = teams.find(t => t.name === teamName);
+        let playerObj = team.players[playerIdxInTeam];
+        let originalPlayer = masterPlayers.find(p => p.id === playerObj.id);
+        if(originalPlayer) originalPlayer.status = 'Available';
+        team.players.splice(playerIdxInTeam, 1);
+        renderTeamSheets();
+        updateDropdowns();
+        renderMaster();
+        saveData();
+    }
+
+    function updateManualPurse(teamName, newVal) {
+        let team = teams.find(t => t.name === teamName);
+        team.currentPurse = parseFloat(newVal);
+        saveData();
+    }
+
+    function renderTeamSheets() {
+        let cont = document.getElementById('teamSheetsContainer');
+        cont.innerHTML = '';
+        teams.forEach(t => {
+            let rows = '';
+            for(let i=0; i<20; i++) {
+                let p = t.players[i];
+                rows += `<tr class="${i < 15 ? 'row-highlight' : ''}"><td>${i+1}</td><td>${p?p.name:''}</td><td>${p?p.role:''}</td><td>${p?p.price.toFixed(2):''}</td><td>${p?`<button class="btn-del-small" onclick="removePlayerFromTeam('${t.name}',${i})">X</button>`:''}</td></tr>`;
+            }
+            cont.innerHTML += `<div class="card"><h3>${t.name}</h3>Purse: <input type="number" value="${t.currentPurse.toFixed(2)}" onchange="updateManualPurse('${t.name}',this.value)"> Cr<table><thead><tr><th>#</th><th>Player</th><th>Role</th><th>Price</th><th>X</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+        });
+    }
+
+    // Run on Load
+    loadData();
+</script>
+</body>
+                                                                                               </html>
