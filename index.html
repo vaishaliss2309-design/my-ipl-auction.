@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IPL Pro Auction - Fair Play</title>
+    <title>IPL Pro Auction - Fair Play & Security</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
     <style>
         :root {
             --dark: #001d3d; --blue: #003566; --gold: #ffc300;
-            --light: #f8f9fa; --danger: #d00000; --success: #28a745;
+            --light: #f8f9fa; --danger: #d00000; --success: #28a745; --warning: #ff9800;
         }
         body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--light); margin: 0; color: #333; }
         .nav { background: var(--dark); padding: 15px; display: none; justify-content: center; gap: 10px; position: sticky; top: 0; z-index: 1000; flex-wrap: wrap;}
@@ -207,11 +207,11 @@
         document.getElementById('myTeamDisplay').innerText = name + " (" + purse + " Cr)";
         
         document.getElementById('biddingAsName').innerText = name;
-        document.getElementById('myBiddingSection').style.display = 'block'; // Show bid buttons
+        document.getElementById('myBiddingSection').style.display = 'block'; 
     }
 
     function enterAuctionWithoutTeam() {
-        document.getElementById('myBiddingSection').style.display = 'none'; // Admin without team cannot bid
+        document.getElementById('myBiddingSection').style.display = 'none'; 
         enterAuction();
     }
 
@@ -247,7 +247,6 @@
         if(data) {
             liveState = data;
             
-            // Update live display
             if(liveState.playerId) {
                 let p = masterPlayers.find(x => x.id == liveState.playerId);
                 if(p) {
@@ -263,7 +262,6 @@
                 document.getElementById('highestBidderLabel').innerText = "None";
             }
 
-            // Update Admin's Pass List
             if(myRole === 'admin') {
                 let passedStr = "None";
                 if(liveState.passedTeams) {
@@ -316,7 +314,6 @@
             return; 
         }
         let p = masterPlayers.find(x => x.id === pId);
-        // Clear passed teams on new player
         db.ref('liveAuction').set({ playerId: p.id, price: p.base, bidder: 'Base Price', passedTeams: null });
     }
 
@@ -335,7 +332,6 @@
 
         if(team.currentPurse < newPrice) return alert("Not enough budget!");
 
-        // If team bids, remove them from 'Passed' list just in case they change their mind
         if(liveState.passedTeams && liveState.passedTeams[myTeamId]) {
             db.ref('liveAuction/passedTeams/' + myTeamId).remove();
         }
@@ -343,14 +339,11 @@
         db.ref('liveAuction').update({ price: newPrice, bidder: team.name });
     }
 
-    // Pass (No Bid)
+    // Pass
     function passBid() {
-        if(!myTeamId) return;
-        if(!liveState.playerId) return;
-        
-        // Add team to passed list in Firebase
+        if(!myTeamId || !liveState.playerId) return;
         db.ref('liveAuction/passedTeams/' + myTeamId).set(myTeamName);
-        alert("तुम्ही माघार घेतली आहे. (Admin has been notified)");
+        alert("तुम्ही माघार घेतली आहे.");
     }
 
     // Auto Sell
@@ -371,7 +364,7 @@
 
         let updatedPurse = team.currentPurse - liveState.price;
         let playerList = team.players || [];
-        playerList.push({ id: p.id, name: p.name, role: p.role, price: liveState.price });
+        playerList.push({ id: p.id, name: p.name, role: p.role, price: liveState.price, dropReq: false });
         
         db.ref('teams/' + team.id).update({ currentPurse: updatedPurse, players: playerList });
         db.ref('players/' + p.id).update({ status: 'SOLD' });
@@ -388,18 +381,39 @@
         document.getElementById('selectFromMaster').value = "";
     }
 
-    // Undo Sold Player
-    function removeSoldPlayer(teamId, pIndex, playerId, price) {
+    // --- MANUAL PURSE EDIT ---
+    function updateManualPurse(teamId, newPurse) {
         if(myRole !== 'admin') return;
-        if(!confirm("या खेळाडूला टीममधून काढायचे आहे का? (पैसे परत मिळतील)")) return;
+        let val = parseFloat(newPurse);
+        if(isNaN(val)) return;
+        
+        if(confirm("तुम्हाला खरोखरच या टीमचे पैसे बदलायचे आहेत का?")) {
+            db.ref('teams/' + teamId).update({ currentPurse: val });
+        } else {
+            renderTeamSheets(); // Undo visually if cancelled
+        }
+    }
+
+    // --- DROP PLAYER SYSTEM (Owner Req -> Admin Approve) ---
+    function requestDropPlayer(teamId, pIndex) {
+        if(!confirm("या खेळाडूला काढण्याची विनंती ॲडमिनला पाठवायची आहे का?")) return;
+        let team = teams.find(t => t.id === teamId);
+        let pList = team.players || [];
+        pList[pIndex].dropReq = true;
+        db.ref('teams/' + teamId).update({ players: pList });
+        alert("ॲडमिनला विनंती पाठवली आहे!");
+    }
+
+    function removeSoldPlayer(teamId, pIndex, playerId) {
+        if(myRole !== 'admin') return;
+        if(!confirm("या खेळाडूला खरोखरच काढायचे आहे का? (पैसे परत मिळणार नाहीत!)")) return;
 
         let team = teams.find(t => t.id === teamId);
-        let newPurse = team.currentPurse + price;
-        
         let pList = team.players || [];
         pList.splice(pIndex, 1);
 
-        db.ref('teams/' + teamId).update({ currentPurse: newPurse, players: pList });
+        // NO Purse Refund logic here.
+        db.ref('teams/' + teamId).update({ players: pList });
         db.ref('players/' + playerId).update({ status: 'Available' });
     }
 
@@ -411,12 +425,37 @@
             let rows = '';
             for(let i=0; i<15; i++) {
                 let p = plist[i];
-                let removeBtn = (p && myRole === 'admin') ? `<button onclick="removeSoldPlayer('${t.id}', ${i}, '${p.id}', ${p.price})" style="background:red; color:white; border:none; border-radius:3px; padding:2px 6px; cursor:pointer;">X</button>` : '';
-                rows += `<tr><td>${i+1}</td><td>${p?p.name:'-'}</td><td>${p?p.price.toFixed(2):'-'}</td><td>${removeBtn}</td></tr>`;
+                let actionHtml = '-';
+                
+                if (p) {
+                    if (myRole === 'admin') {
+                        if (p.dropReq) {
+                            actionHtml = `<button onclick="removeSoldPlayer('${t.id}', ${i}, '${p.id}')" style="background:red; color:white; border:none; border-radius:3px; padding:4px 8px; cursor:pointer;">Approve Drop</button>`;
+                        } else {
+                            actionHtml = `<span style="font-size:12px; color:gray;">-</span>`;
+                        }
+                    } else if (myTeamId === t.id) {
+                        if (p.dropReq) {
+                            actionHtml = `<span style="font-size:12px; color:var(--warning); font-weight:bold;">Requested...</span>`;
+                        } else {
+                            actionHtml = `<button onclick="requestDropPlayer('${t.id}', ${i})" style="background:var(--warning); color:white; border:none; border-radius:3px; padding:4px 8px; cursor:pointer;">Drop Req</button>`;
+                        }
+                    }
+                }
+                
+                rows += `<tr><td>${i+1}</td><td>${p?p.name:'-'}</td><td>${p?p.price.toFixed(2):'-'}</td><td>${actionHtml}</td></tr>`;
             }
+            
+            let purseHtml = '';
+            if (myRole === 'admin') {
+                purseHtml = `<input type="number" value="${t.currentPurse.toFixed(2)}" onchange="updateManualPurse('${t.id}', this.value)" style="width:100px; padding:5px; font-weight:bold; color:var(--danger); border:1px solid #ccc;"> Cr`;
+            } else {
+                purseHtml = `<span style="color:var(--danger);">${t.currentPurse.toFixed(2)} Cr</span>`;
+            }
+
             cont.innerHTML += `<div class="card">
                 <h3 style="margin:0; color:var(--blue);">${t.name}</h3>
-                <h4 style="margin:5px 0 10px 0; color:var(--danger);">Remaining: ${t.currentPurse.toFixed(2)} Cr</h4>
+                <h4 style="margin:5px 0 10px 0;">Remaining: ${purseHtml}</h4>
                 <table><thead><tr><th>#</th><th>Player</th><th>Price</th><th>Act</th></tr></thead><tbody>${rows}</tbody></table></div>`;
         });
     }
@@ -431,3 +470,4 @@
 </script>
 </body>
 </html>
+
