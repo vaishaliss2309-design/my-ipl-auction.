@@ -116,12 +116,8 @@
         <div class="card" style="text-align: center;">
             
             <div class="admin-only" style="background: #e2e8f0; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
-                <h3 style="margin-top:0;">Admin Control</h3>
+                <h3 style="margin-top:0;">Admin Control (Select Player to Start Timer)</h3>
                 <select id="selectFromMaster" onchange="loadPlayerToAuction()"></select>
-                <div style="display:flex; gap:10px; margin-top:15px;">
-                    <button id="adminBtnSold" onclick="autoSellPlayer()" style="background: var(--success); color: white; padding: 15px; border: none; border-radius: 5px; flex:1; font-weight:bold; font-size:16px; display:none;">✅ Force SELL</button>
-                    <button id="adminBtnUnsold" onclick="markUnsold()" style="background: var(--danger); color: white; padding: 15px; border: none; border-radius: 5px; flex:1; font-weight:bold; font-size:16px;">❌ UNSOLD</button>
-                </div>
             </div>
 
             <div id="auctionDisplay" style="background: var(--dark); color: var(--gold); padding: 30px 10px; border-radius: 15px; border: 3px solid var(--gold);">
@@ -241,7 +237,6 @@
         showPage('setupPage');
     }
 
-    // 💡 JOIN ROOM PROMPT UPDATED: Checks for Admin Pass vs User Pass
     function joinRoomPrompt(rId, rName, userPass, adminPass) {
         let inputPass = prompt("Enter Password for Room: " + rName + "\n(If you are Admin, enter Admin Password)");
         
@@ -397,8 +392,10 @@
     function loadPlayerToAuction() {
         let pId = document.getElementById('selectFromMaster').value;
         if(pId === "") { getRef('liveAuction').set({ playerId: null, price: 0, bidder: 'None', lastBidTime: null }); return; }
+        
         let p = masterPlayers.find(x => x.id === pId);
-        getRef('liveAuction').set({ playerId: p.id, price: p.base, bidder: 'Base Price', lastBidTime: null });
+        // Set lastBidTime immediately so the timer starts instantly for Base Price
+        getRef('liveAuction').set({ playerId: p.id, price: p.base, bidder: 'Base Price', lastBidTime: Date.now() });
     }
 
     // --- LIVE AUCTION DISPLAY & LOGIC ---
@@ -420,18 +417,14 @@
         }
     }
 
-    // 💡 AUTO TIMER LOGIC
+    // 💡 AUTO TIMER LOGIC (1 Min starts immediately)
     function startLocalTimer() {
         clearInterval(auctionTimerInterval);
         
-        // जर प्लेयर सिलेक्ट केलेला नसेल, किंवा कोणी बिड लावली नसेल (Base Price असेल), तर टायमर बंद ठेव
-        if(!liveState.playerId || liveState.bidder === 'None' || liveState.bidder === 'Base Price' || !liveState.lastBidTime) {
+        if(!liveState.playerId || !liveState.lastBidTime) {
             document.getElementById('timerDisplay').style.display = 'none';
-            if(myRole === 'admin') document.getElementById('adminBtnSold').style.display = 'none';
             return;
         }
-
-        if(myRole === 'admin') document.getElementById('adminBtnSold').style.display = 'block';
 
         auctionTimerInterval = setInterval(() => {
             let elapsed = Date.now() - liveState.lastBidTime;
@@ -443,19 +436,23 @@
                 timerDiv.innerHTML = "⏳ Waiting... (" + Math.ceil((3000 - elapsed)/1000) + "s)";
                 timerDiv.style.color = "var(--warning)";
             } else if (elapsed < 63000) {
-                // 3 सेकंदानंतर 60 सेकंदांचा टायमर
+                // 3 सेकंदानंतर 60 सेकंदांचा टायमर (Total 63 sec)
                 let timeLeft = Math.ceil((63000 - elapsed) / 1000);
                 timerDiv.innerHTML = "⏱️ Time Left: " + timeLeft + "s";
                 timerDiv.style.color = "#ff4d4d"; // Red
             } else {
-                // 63 सेकंद (3s + 60s) पूर्ण झाले
-                timerDiv.innerHTML = "🔨 SOLD!";
+                // टायमर संपला
+                timerDiv.innerHTML = "🔨 Time UP!";
                 timerDiv.style.color = "var(--success)";
                 clearInterval(auctionTimerInterval);
                 
-                // फक्त ॲडमिनच्या सिस्टममधून Auto-sell फंक्शन कॉल होईल (डबल एंट्री टाळण्यासाठी)
+                // फक्त ॲडमिनच्या सिस्टममधून Auto-sell/Unsold फंक्शन कॉल होईल
                 if(myRole === 'admin') {
-                    autoSellPlayer();
+                    if (liveState.bidder === 'Base Price' || liveState.bidder === 'None') {
+                        markUnsold();
+                    } else {
+                        autoSellPlayer();
+                    }
                 }
             }
         }, 200);
@@ -477,15 +474,16 @@
 
         if(team.currentPurse < newPrice) return alert("Not enough budget!");
 
-        // जेव्हा नवीन बिड लागते, तेव्हा lastBidTime अपडेट होतो, ज्यामुळे सर्व डिव्हाइसवर टायमर परत रिसेट होतो
+        // जेव्हा नवीन बिड लागते, तेव्हा lastBidTime अपडेट होतो, ज्यामुळे टायमर परत रिसेट होतो
         getRef('liveAuction').update({ price: newPrice, bidder: team.name, lastBidTime: Date.now() });
     }
 
     function autoSellPlayer() {
         if(!liveState.playerId || liveState.bidder === 'Base Price') return;
         let team = teams.find(t => t.name === liveState.bidder);
-        let p = masterPlayers.find(x => x.id === liveState.playerId);
+        if(!team) return;
         
+        let p = masterPlayers.find(x => x.id === liveState.playerId);
         let updatedPurse = team.currentPurse - liveState.price;
         let playerList = team.players || [];
         playerList.push({ id: p.id, name: p.name, role: p.role, price: liveState.price, dropReq: false });
@@ -501,29 +499,33 @@
         if(!liveState.playerId) return;
         getRef('players/' + liveState.playerId).update({ status: 'UNSOLD' });
         getRef('liveAuction').set({ playerId: null, price: 0, bidder: 'UNSOLD', lastBidTime: null });
-        document.getElementById('selectFromMaster').value = "";
+        if(myRole === 'admin') document.getElementById('selectFromMaster').value = "";
     }
 
     // --- DASHBOARD / TEAM SHEETS ---
-    function updateManualPurse(teamId, newPurse) {
+    function updateManualPurse(teamId) {
         if(myRole !== 'admin') return;
-        if(confirm("Change team purse?")) getRef('teams/' + teamId).update({ currentPurse: parseFloat(newPurse) });
+        let newPurse = document.getElementById('purse_' + teamId).value;
+        if(confirm("Are you sure you want to update purse to " + newPurse + " Cr?")) {
+            getRef('teams/' + teamId).update({ currentPurse: parseFloat(newPurse) });
+        }
     }
     
+    function removeSoldPlayerDirectly(teamId, pIndex, playerId) {
+        if(myRole === 'admin' && confirm("Admin: Remove this player from team? (Purse refund will NOT happen automatically. Update purse manually if needed.)")) {
+            let t = teams.find(x => x.id === teamId);
+            let pList = t.players || [];
+            pList.splice(pIndex, 1);
+            getRef('teams/' + teamId).update({ players: pList });
+            getRef('players/' + playerId).update({ status: 'Available' });
+        }
+    }
+
     function requestDropPlayer(teamId, pIndex) {
         if(confirm("Send drop request to admin?")) {
             let pList = teams.find(t => t.id === teamId).players || [];
             pList[pIndex].dropReq = true;
             getRef('teams/' + teamId).update({ players: pList });
-        }
-    }
-
-    function removeSoldPlayer(teamId, pIndex, playerId) {
-        if(myRole === 'admin' && confirm("Approve Drop Request? (No Refund)")) {
-            let pList = teams.find(t => t.id === teamId).players || [];
-            pList.splice(pIndex, 1);
-            getRef('teams/' + teamId).update({ players: pList });
-            getRef('players/' + playerId).update({ status: 'Available' });
         }
     }
 
@@ -538,15 +540,25 @@
                 let act = '-';
                 if(p) {
                     if(myRole === 'admin') {
-                        act = p.dropReq ? `<button onclick="removeSoldPlayer('${t.id}',${i},'${p.id}')" style="background:red; color:white; border:none; padding:2px 5px; cursor:pointer;">Approve Drop</button>` : '-';
+                        // Admin can cut anyone directly
+                        act = `<button onclick="removeSoldPlayerDirectly('${t.id}',${i},'${p.id}')" style="background:var(--danger); color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; font-weight:bold;">Cut</button>`;
+                        if(p.dropReq) act += ` <span style="color:var(--danger); font-size:10px;">(Drop Req)</span>`;
                     } else if(myTeamId === t.id) {
                         act = p.dropReq ? `<span style="color:var(--warning);">Requested</span>` : `<button onclick="requestDropPlayer('${t.id}',${i})" style="background:var(--warning); color:white; border:none; padding:2px 5px; cursor:pointer;">Drop Req</button>`;
                     }
                 }
                 rows += `<tr><td>${i+1}</td><td>${p?p.name:'-'}</td><td>${p?p.price.toFixed(2):'-'}</td><td>${act}</td></tr>`;
             }
-            let pInput = myRole === 'admin' ? `<input type="number" value="${t.currentPurse.toFixed(2)}" onchange="updateManualPurse('${t.id}',this.value)" style="width:100px;">` : t.currentPurse.toFixed(2);
-            cont.innerHTML += `<div class="card"><h3 style="margin:0;color:var(--blue);">${t.name}</h3><h4>Purse: ${pInput} Cr</h4><table><thead><tr><th>#</th><th>Player</th><th>Price</th><th>Act</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+            
+            // Explicit Save button for Purse
+            let pInput = myRole === 'admin' ? 
+                `<input type="number" id="purse_${t.id}" value="${t.currentPurse.toFixed(2)}" style="width:100px; padding:4px;"> 
+                 <button onclick="updateManualPurse('${t.id}')" style="background:var(--success); color:white; border:none; padding:6px; cursor:pointer; border-radius:4px;">Save</button>` 
+                : t.currentPurse.toFixed(2);
+                
+            cont.innerHTML += `<div class="card"><h3 style="margin:0;color:var(--blue);">${t.name}</h3>
+                               <h4 style="display:flex; align-items:center; gap:10px;">Purse: ${pInput} Cr</h4>
+                               <table><thead><tr><th>#</th><th>Player</th><th>Price</th><th>Act</th></tr></thead><tbody>${rows}</tbody></table></div>`;
         });
     }
 
