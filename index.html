@@ -32,7 +32,13 @@
         .badge { padding: 4px 8px; border-radius: 4px; font-size: 12px; color: white; font-weight: bold; }
         .WK { background: #e63946; } .Batter { background: #457b9d; } .Bowler { background: #1d3557; } .AR { background: #fb8500; }
         
-        .admin-only { display: none; }
+        /* 1. Admin Visibility Fixes */
+        .admin-only { display: none !important; }
+        body[data-role="admin"] .admin-only { display: block !important; }
+        body[data-role="admin"] th.admin-only, 
+        body[data-role="admin"] td.admin-only { display: table-cell !important; }
+        body[data-role="admin"] div.admin-only { display: flex !important; }
+
         .room-item { background: #e2e8f0; padding: 15px; border-radius: 8px; margin-bottom: 10px; cursor: pointer; border-left: 5px solid var(--blue); display:flex; justify-content:space-between; align-items:center; font-weight:bold;}
         .room-item:hover { background: #cbd5e1; }
         
@@ -56,7 +62,7 @@
         <h2>Create Auction Room</h2>
         <input type="text" id="rName" placeholder="Room Name (e.g. IPL 2026)">
         <input type="password" id="rPass" placeholder="Set Room Password (For Normal Teams)">
-        <input type="password" id="rAdminPass" placeholder="Set ADMIN Password (For Admin Re-login)">
+        <input type="password" id="rAdminPass" placeholder="Set ADMIN Password (Must be different!)">
         <button onclick="createRoom()" style="background:var(--success); color:white; border:none; padding:15px; border-radius:5px; width:100%; font-size: 18px; font-weight:bold; margin-bottom:10px;">Create Room</button>
         <button onclick="showPage('mainMenuPage')" style="background:#ccc; padding:10px; width:100%; border:none; border-radius:5px;">Back</button>
     </div>
@@ -79,7 +85,7 @@
         <input type="password" id="tPassLogin" placeholder="Enter Team Password">
         <button onclick="loginToTeam()" style="background:var(--dark); color:white; border:none; padding:12px; border-radius:5px; width:100%; font-weight:bold;">LOGIN TO TEAM</button>
         
-        <button class="admin-only" onclick="setupUI(true)" style="background:#6c757d; color:white; border:none; padding:12px; border-radius:5px; width:100%; font-weight:bold; margin-top:20px;">SKIP (Admin Control Only - No Team)</button>
+        <button class="admin-only" onclick="setupUI(true)" style="background:#6c757d; color:white; border:none; padding:12px; border-radius:5px; width:100%; font-weight:bold; margin-top:20px; display:block;">SKIP (Admin Control Only - No Team)</button>
     </div>
 </div>
 
@@ -95,18 +101,18 @@
     <div id="masterPage" class="page">
         <div class="card">
             <h2>Player List</h2>
-            <div class="admin-only" style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; background: #f1f5f9; padding: 10px; border-radius: 8px;">
+            <div class="admin-only" style="gap: 10px; flex-wrap: wrap; margin-bottom: 20px; background: #f1f5f9; padding: 10px; border-radius: 8px;">
                 <input type="text" id="pName" placeholder="Player Name" style="flex:1; min-width:150px;">
                 <select id="pRole" style="flex:1; min-width:100px;">
                     <option value="Batter">Batter</option><option value="Bowler">Bowler</option>
                     <option value="WK">WK</option><option value="AR">All-Rounder</option>
                 </select>
                 <input type="number" id="pBase" placeholder="Base Price" style="flex:1; min-width:100px;">
-                <button onclick="addPlayerToMaster()" style="background:var(--blue); color:white; border:none; padding:10px; border-radius:5px; width:100%;">Add</button>
+                <button onclick="addPlayerToMaster()" style="background:var(--blue); color:white; border:none; padding:10px; border-radius:5px; width:100%;">Add Player</button>
             </div>
             <div style="overflow-x:auto;">
                 <table>
-                    <thead><tr><th>Name</th><th>Role</th><th>Base</th><th>Status</th><th class="admin-only">Action</th></tr></thead>
+                    <thead><tr><th>Name</th><th>Role</th><th>Base</th><th>Status</th><th class="admin-only">Action (Delete)</th></tr></thead>
                     <tbody id="masterTbody"></tbody>
                 </table>
             </div>
@@ -116,12 +122,12 @@
     <div id="livePage" class="page">
         <div class="card" style="text-align: center;">
             
-            <div class="admin-only" style="background: #e2e8f0; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+            <div class="admin-only" style="background: #e2e8f0; padding: 15px; border-radius: 8px; margin-bottom: 15px; display:block;">
                 <h3 style="margin-top:0;">Admin Control (Select Player to Start Timer)</h3>
                 <select id="selectFromMaster" onchange="loadPlayerToAuction()"></select>
                 
                 <div style="display:flex; gap:10px; margin-top:15px;">
-                    <button id="adminBtnSold" onclick="autoSellPlayer()" style="background: var(--success); color: white; padding: 15px; border: none; border-radius: 5px; flex:1; font-weight:bold; font-size:16px; display:none;">✅ Force SELL</button>
+                    <button id="adminBtnSold" onclick="autoSellPlayer()" style="background: var(--success); color: white; padding: 15px; border: none; border-radius: 5px; flex:1; font-weight:bold; font-size:16px; display:none;">🛑 FORCE SELL / STOP</button>
                     <button id="adminBtnUnsold" onclick="markUnsold()" style="background: var(--danger); color: white; padding: 15px; border: none; border-radius: 5px; flex:1; font-weight:bold; font-size:16px; display:none;">❌ UNSOLD</button>
                 </div>
             </div>
@@ -155,12 +161,11 @@
 
     <div id="dashboardPage" class="page">
         <div id="teamSheetsContainer" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px;"></div>
-        <button class="admin-only" onclick="deleteCurrentRoom()" style="background: #333; color: white; padding: 10px; border: none; cursor: pointer; margin-top: 30px; width: 100%;">DELETE THIS ROOM</button>
+        <button class="admin-only" onclick="deleteCurrentRoom()" style="background: #333; color: white; padding: 10px; border: none; cursor: pointer; margin-top: 30px; width: 100%; display:block;">DELETE THIS ROOM</button>
     </div>
 </div>
 
 <script>
-    // 1. FIREBASE CONFIGURATION
     const firebaseConfig = {
       apiKey: "AIzaSyDUJtHfviF4dYWVCuewXrAj1c5q0ETgQxQ",
       authDomain: "ipl-live-action.firebaseapp.com",
@@ -176,7 +181,6 @@
     }
     const db = firebase.database();
 
-    // Session Data
     let currentRoomId = localStorage.getItem('ipl_roomId') || '';
     let myRole = localStorage.getItem('ipl_role') || ''; 
     let myTeamId = localStorage.getItem('ipl_teamId') || ''; 
@@ -189,9 +193,9 @@
 
     const getRef = (path) => db.ref('rooms/' + currentRoomId + '/' + path);
 
-    // --- ON LOAD CHECK ---
     window.onload = () => {
         if(currentRoomId && myRole) {
+            document.body.setAttribute('data-role', myRole); // CSS Trigger
             startRoomListeners();
             if(myRole === 'user' && !myTeamId) {
                 document.getElementById('displayRoomName').innerText = "Current Room";
@@ -209,7 +213,6 @@
         location.reload();
     }
 
-    // --- ROOM MANAGEMENT ---
     function loadRoomList() {
         db.ref('rooms').on('value', snap => {
             let html = '';
@@ -234,6 +237,7 @@
         let adminPass = document.getElementById('rAdminPass').value.trim();
         
         if(!name || !pass || !adminPass) return alert("Please enter Name, User Password, and Admin Password!");
+        if(pass === adminPass) return alert("User Password and Admin Password MUST BE DIFFERENT!");
         
         let rId = "Room_" + Date.now();
         db.ref('rooms/' + rId + '/config').set({ name: name, password: pass, adminPassword: adminPass });
@@ -242,30 +246,31 @@
         localStorage.setItem('ipl_role', 'admin');
         currentRoomId = rId;
         myRole = 'admin';
+        document.body.setAttribute('data-role', 'admin');
         
         document.getElementById('mainMenuPage').style.display = 'none';
         document.getElementById('displayRoomName').innerText = name;
-        
-        document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'block');
         
         startRoomListeners();
         showPage('setupPage');
     }
 
     function joinRoomPrompt(rId, rName, userPass, adminPass) {
-        let inputPass = prompt("Enter Password for Room: " + rName + "\n(If you are Admin, enter Admin Password)");
+        let inputPass = prompt("Enter Password for Room: " + rName + "\n(Users enter Normal Pass, Admins enter Admin Pass)");
         
         if(inputPass === adminPass) {
             localStorage.setItem('ipl_roomId', rId);
             localStorage.setItem('ipl_role', 'admin');
             currentRoomId = rId;
             myRole = 'admin';
+            document.body.setAttribute('data-role', 'admin');
             enterRoomUI(rName);
         } else if(inputPass === userPass) {
             localStorage.setItem('ipl_roomId', rId);
             localStorage.setItem('ipl_role', 'user');
             currentRoomId = rId;
             myRole = 'user';
+            document.body.setAttribute('data-role', 'user');
             enterRoomUI(rName);
         } else if(inputPass !== null) {
             alert("Incorrect Password!");
@@ -275,15 +280,7 @@
     function enterRoomUI(rName) {
         document.getElementById('mainMenuPage').style.display = 'none';
         document.getElementById('displayRoomName').innerText = rName;
-        
-        if(myRole === 'admin') {
-            document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'block');
-        } else {
-            document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
-        }
-        
         startRoomListeners();
-        
         if(myTeamId) { setupUI(); } else { showPage('setupPage'); }
     }
 
@@ -314,12 +311,6 @@
         document.getElementById('setupPage').style.display = 'none';
         document.getElementById('mainNav').style.display = 'flex';
         
-        if(myRole === 'admin') {
-            document.querySelectorAll('.admin-only').forEach(el => el.style.display = el.tagName === 'TH' ? 'table-cell' : 'block');
-        } else {
-            document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
-        }
-        
         if(myTeamId && !skipTeam) {
             document.getElementById('myBiddingSection').style.display = 'block';
             document.getElementById('biddingAsName').innerText = myTeamName;
@@ -339,7 +330,6 @@
         
         myTeamId = "T_" + Date.now();
         myTeamName = name;
-        
         getRef('teams/' + myTeamId).set({ id: myTeamId, name: name, currentPurse: purse, password: pass, players: [] });
 
         localStorage.setItem('ipl_teamId', myTeamId);
@@ -385,7 +375,7 @@
     function renderMaster() {
         let tbodyHtml = '';
         masterPlayers.forEach(p => {
-            let actionBtn = myRole === 'admin' ? `<td><button onclick="deletePlayer('${p.id}')" style="background:var(--danger);color:white;border:none;padding:5px; border-radius:4px;">Del</button></td>` : '';
+            let actionBtn = `<td class="admin-only"><button onclick="deletePlayer('${p.id}')" style="background:var(--danger);color:white;border:none;padding:5px 10px; border-radius:4px; font-weight:bold; cursor:pointer;">Delete</button></td>`;
             tbodyHtml += `<tr style="${p.status === 'SOLD' ? 'opacity:0.4' : ''}">
                 <td>${p.name}</td><td><span class="badge ${p.role}">${p.role}</span></td>
                 <td>${p.base}</td><td>${p.status}</td>${actionBtn}</tr>`;
@@ -393,7 +383,7 @@
         document.getElementById('masterTbody').innerHTML = tbodyHtml;
     }
     
-    function deletePlayer(id) { if(confirm("Delete Player?")) getRef('players/' + id).remove(); }
+    function deletePlayer(id) { if(confirm("Are you sure you want to Delete this Player?")) getRef('players/' + id).remove(); }
     
     function updateAdminPlayerSelect() {
         let mSel = document.getElementById('selectFromMaster');
@@ -408,7 +398,6 @@
     function loadPlayerToAuction() {
         let pId = document.getElementById('selectFromMaster').value;
         if(pId === "") { getRef('liveAuction').set({ playerId: null, price: 0, bidder: 'None', lastBidTime: null, passedTeams: null }); return; }
-        
         let p = masterPlayers.find(x => x.id === pId);
         getRef('liveAuction').set({ playerId: p.id, price: p.base, bidder: 'Base Price', lastBidTime: Date.now(), passedTeams: null });
     }
@@ -436,10 +425,8 @@
         document.getElementById('globalPassedTeamsList').innerText = passedStr;
     }
 
-    // 💡 AUTO TIMER LOGIC 
     function startLocalTimer() {
         clearInterval(auctionTimerInterval);
-        
         if(!liveState.playerId || !liveState.lastBidTime) {
             document.getElementById('timerDisplay').style.display = 'none';
             return;
@@ -463,11 +450,8 @@
                 clearInterval(auctionTimerInterval);
                 
                 if(myRole === 'admin') {
-                    if (liveState.bidder === 'Base Price' || liveState.bidder === 'None') {
-                        markUnsold();
-                    } else {
-                        autoSellPlayer();
-                    }
+                    if (liveState.bidder === 'Base Price' || liveState.bidder === 'None') { markUnsold(); } 
+                    else { autoSellPlayer(); }
                 }
             }
         }, 200);
@@ -502,6 +486,7 @@
                         btnUnsold.style.display = 'none'; btnSold.style.display = 'none';
                     }
                 } else {
+                    // Force Stop Logic: If everyone else passed, allow immediate Sell
                     if(passedCount >= totalTeams - 1 && totalTeams > 1) {
                         btnSold.style.display = 'block'; btnUnsold.style.display = 'none';
                     } else if(totalTeams === 1) {
@@ -519,12 +504,9 @@
     function placeBid() {
         if(!myTeamId || !liveState.playerId) return;
         let team = teams.find(t => t.id === myTeamId);
-        
         let inc = (liveState.price >= 20) ? 1.0 : (liveState.price >= 10 ? 0.5 : 0.25);
         let newPrice = liveState.price + inc;
-
         if(team.currentPurse < newPrice) return alert("Not enough budget!");
-
         getRef('liveAuction').update({ price: newPrice, bidder: team.name, lastBidTime: Date.now(), passedTeams: null });
     }
 
@@ -537,7 +519,6 @@
         if(!liveState.playerId || liveState.bidder === 'Base Price') return;
         let team = teams.find(t => t.name === liveState.bidder);
         if(!team) return;
-        
         let p = masterPlayers.find(x => x.id === liveState.playerId);
         let updatedPurse = team.currentPurse - liveState.price;
         let playerList = team.players || [];
@@ -546,7 +527,6 @@
         getRef('teams/' + team.id).update({ currentPurse: updatedPurse, players: playerList });
         getRef('players/' + p.id).update({ status: 'SOLD' });
         getRef('liveAuction').set({ playerId: null, price: 0, bidder: 'SOLD to ' + team.name, lastBidTime: null, passedTeams: null });
-        
         if(myRole === 'admin') document.getElementById('selectFromMaster').value = "";
     }
 
@@ -595,11 +575,8 @@
                 let act = '-';
                 if(p) {
                     if(myRole === 'admin') {
-                        if (p.dropReq) {
-                            act = `<button onclick="removeSoldPlayerDirectly('${t.id}',${i},'${p.id}')" style="background:var(--danger); color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; font-weight:bold;">Approve Cut</button>`;
-                        } else {
-                            act = `<span style="color:#888; font-size:12px;">No Req</span>`;
-                        }
+                        if (p.dropReq) { act = `<button onclick="removeSoldPlayerDirectly('${t.id}',${i},'${p.id}')" style="background:var(--danger); color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; font-weight:bold;">Approve Cut</button>`; } 
+                        else { act = `<span style="color:#888; font-size:12px;">No Req</span>`; }
                     } else if(myTeamId === t.id) {
                         act = p.dropReq ? `<span style="color:var(--warning);">Requested</span>` : `<button onclick="requestDropPlayer('${t.id}',${i})" style="background:var(--warning); color:white; border:none; padding:2px 5px; cursor:pointer;">Drop Req</button>`;
                     }
@@ -609,13 +586,21 @@
             
             let pInput = myRole === 'admin' ? 
                 `<input type="number" id="purse_${t.id}" value="${t.currentPurse.toFixed(2)}" style="width:100px; padding:4px;"> 
-                 <button onclick="updateManualPurse('${t.id}')" style="background:var(--success); color:white; border:none; padding:6px; cursor:pointer; border-radius:4px;">Save</button>` 
+                 <button onclick="updateManualPurse('${t.id}')" style="background:var(--success); color:white; border:none; padding:6px; cursor:pointer; border-radius:4px; font-weight:bold;">Save Edit</button>` 
                 : t.currentPurse.toFixed(2);
                 
             cont.innerHTML += `<div class="card"><h3 style="margin:0;color:var(--blue);">${t.name}</h3>
-                               <h4 style="display:flex; align-items:center; gap:10px;">Purse: ${pInput} Cr</h4>
+                               <h4 style="display:flex; align-items:center; gap:10px;">Purse: <span class="admin-only" style="display:none;">${pInput}</span> <span class="user-purse-display">${t.currentPurse.toFixed(2)}</span> Cr</h4>
                                <table><thead><tr><th>#</th><th>Player</th><th>Price</th><th>Act</th></tr></thead><tbody>${rows}</tbody></table></div>`;
         });
+
+        // Toggle visibility for purse input based on role
+        if (myRole === 'admin') {
+            document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'block');
+            document.querySelectorAll('.user-purse-display').forEach(el => el.style.display = 'none');
+        } else {
+            document.querySelectorAll('.user-purse-display').forEach(el => el.style.display = 'inline-block');
+        }
     }
 
     function deleteCurrentRoom() {
