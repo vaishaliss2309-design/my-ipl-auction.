@@ -96,6 +96,7 @@
     <button class="nav-btn" onclick="showPage('masterPage')">PLAYERS</button>
     <button class="nav-btn active" onclick="showPage('livePage')">LIVE AUCTION</button>
     <button class="nav-btn" onclick="showPage('dashboardPage')">TEAMS</button>
+    <button class="nav-btn" onclick="showPage('chatPage')">CHAT 💬</button>
     <button class="nav-btn" onclick="logout()" style="background:var(--danger);">LOGOUT</button>
 </div>
 
@@ -166,6 +167,21 @@
         <div id="teamSheetsContainer" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px;"></div>
         <button class="admin-only" onclick="deleteCurrentRoom()" style="background: #333; color: white; padding: 10px; border: none; cursor: pointer; margin-top: 30px; width: 100%;">DELETE THIS ROOM</button>
     </div>
+
+    <div id="chatPage" class="page">
+        <div class="card" style="display: flex; flex-direction: column; height: 60vh;">
+            <h2 style="margin-top:0; color:var(--blue);">💬 Room Chat</h2>
+            
+            <div id="chatMessagesBox" style="flex:1; overflow-y:auto; background:#f1f5f9; padding:15px; border-radius:8px; margin-bottom:15px; display:flex; flex-direction:column; gap:10px; border: 1px solid #ccc;">
+                </div>
+            
+            <div style="display:flex; gap:10px;">
+                <input type="text" id="chatInput" placeholder="Type a message..." style="margin-bottom:0; flex:1; font-size:16px;" onkeypress="if(event.key === 'Enter') sendChatMessage()">
+                <button onclick="sendChatMessage()" style="background:var(--blue); color:white; border:none; padding:12px 20px; border-radius:5px; font-weight:bold; cursor:pointer; font-size:16px;">Send</button>
+            </div>
+        </div>
+    </div>
+
 </div>
 
 <script>
@@ -225,7 +241,6 @@
         });
     }
 
-    // 🔥 NEW: Create Room & Admin Team Together
     function createRoomAndAdminTeam() {
         let name = document.getElementById('rName').value.trim();
         let pass = document.getElementById('rPass').value.trim();
@@ -237,10 +252,7 @@
         let rId = "Room_" + Date.now();
         let tId = "T_" + Date.now();
         
-        // Save Room Data
         db.ref('rooms/' + rId + '/config').set({ name: name, password: pass });
-        
-        // Save Admin Team Data
         db.ref('rooms/' + rId + '/teams/' + tId).set({ 
             id: tId, name: adminTeamName, currentPurse: 100, password: adminTeamPass, players: [], isAdmin: true 
         });
@@ -260,7 +272,7 @@
         document.getElementById('displayRoomName').innerText = name;
         
         startRoomListeners();
-        setupUI(); // Direct go to live page
+        setupUI(); 
     }
 
     function joinRoomPrompt(rId, rName, actualPass) {
@@ -297,6 +309,48 @@
             updateBiddingRules();
             startLocalTimer(); 
         });
+
+        // 🔥 CHAT LISTENER 🔥
+        getRef('chat').on('value', snap => {
+            let chatBox = document.getElementById('chatMessagesBox');
+            chatBox.innerHTML = '';
+            let msgs = snap.val();
+            if(msgs) {
+                Object.values(msgs).forEach(m => {
+                    let isMe = m.senderId === myTeamId;
+                    let align = isMe ? 'align-self: flex-end; background: #d1fae5; border: 1px solid #10b981;' : 'align-self: flex-start; background: #fff; border: 1px solid #cbd5e1;';
+                    let nameColor = isMe ? '#059669' : '#334155';
+                    
+                    chatBox.innerHTML += `
+                        <div style="max-width: 75%; padding: 8px 12px; border-radius: 8px; ${align} box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+                            <div style="font-size: 11px; color: ${nameColor}; font-weight: bold; margin-bottom: 4px;">${m.senderName}</div>
+                            <div style="font-size: 15px; color: #111; word-break: break-word;">${m.text}</div>
+                        </div>
+                    `;
+                });
+                chatBox.scrollTop = chatBox.scrollHeight; 
+            } else {
+                chatBox.innerHTML = '<p style="text-align:center; color:#888; margin-top:20px;">No messages yet. Say Hi! 👋</p>';
+            }
+        });
+    }
+
+    // 🔥 CHAT SEND FUNCTION 🔥
+    function sendChatMessage() {
+        let input = document.getElementById('chatInput');
+        let text = input.value.trim();
+        if(!text || !myTeamId) return;
+        
+        let msgId = "Msg_" + Date.now();
+        getRef('chat/' + msgId).set({
+            id: msgId,
+            senderId: myTeamId,
+            senderName: myTeamName,
+            text: text,
+            timestamp: Date.now()
+        });
+        
+        input.value = '';
     }
 
     function setupUI() {
@@ -320,7 +374,7 @@
         
         myTeamId = "T_" + Date.now();
         myTeamName = name;
-        myRole = 'user'; // Users creating here are normal users
+        myRole = 'user'; 
         
         getRef('teams/' + myTeamId).set({ id: myTeamId, name: name, currentPurse: purse, password: pass, players: [], isAdmin: false });
 
@@ -332,7 +386,6 @@
         setupUI();
     }
 
-    // 🔥 NEW: Login identifies Admin via Team Data
     function loginToTeam() {
         let tId = document.getElementById('existingTeamSelect').value;
         let pass = document.getElementById('tPassLogin').value;
@@ -342,7 +395,6 @@
         if(team.password === pass) {
             myTeamId = team.id;
             myTeamName = team.name;
-            // Check if this team has Admin rights
             myRole = team.isAdmin ? 'admin' : 'user';
             
             localStorage.setItem('ipl_teamId', myTeamId);
@@ -570,7 +622,6 @@
         }
     }
 
-    // 🔥 NEW: Logic for Cutting own players vs Appproving others
     function renderTeamSheets() {
         let cont = document.getElementById('teamSheetsContainer');
         cont.innerHTML = '';
@@ -583,10 +634,8 @@
                 if(p) {
                     if(myRole === 'admin') {
                         if (t.id === myTeamId) {
-                            // Admin cutting their OWN player directly
                             act = `<button onclick="removeSoldPlayerDirectly('${t.id}',${i},'${p.id}')" style="background:var(--danger); color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; font-weight:bold;">Cut (Own)</button>`;
                         } else {
-                            // Admin looking at ANOTHER team
                             if (p.dropReq) { 
                                 act = `<button onclick="removeSoldPlayerDirectly('${t.id}',${i},'${p.id}')" style="background:var(--warning); color:#000; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; font-weight:bold;">Approve Cut</button>`; 
                             } else { 
