@@ -27,12 +27,12 @@
         
         .bid-btn { background: var(--gold); color: var(--dark); border: none; padding: 15px; font-size: 20px; font-weight: bold; border-radius: 8px; cursor: pointer; width: 100%; margin-bottom: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.2);}
         .pass-btn { background: var(--danger); color: white; border: none; padding: 15px; font-size: 18px; font-weight: bold; border-radius: 8px; cursor: pointer; width: 100%; box-shadow: 0 4px 6px rgba(0,0,0,0.2);}
-        .bid-btn:disabled, .pass-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+        .bid-btn:disabled, .pass-btn:disabled { opacity: 0.8; cursor: not-allowed; transform: none; box-shadow: none; background: #e2e8f0; color: #333;}
         
         .badge { padding: 4px 8px; border-radius: 4px; font-size: 12px; color: white; font-weight: bold; }
         .WK { background: #e63946; } .Batter { background: #457b9d; } .Bowler { background: #1d3557; } .AR { background: #fb8500; }
         
-        /* 1. Admin Visibility Fixes */
+        /* Admin Visibility Fixes */
         .admin-only { display: none !important; }
         body[data-role="admin"] .admin-only { display: block !important; }
         body[data-role="admin"] th.admin-only, 
@@ -144,7 +144,7 @@
             </div>
             
             <div style="background:#fff; padding:10px; border-radius:5px; margin-top:15px; border: 2px solid #ccc;">
-                <h4 style="margin:0 0 5px 0; color:var(--danger);">Teams Passed:</h4>
+                <h4 style="margin:0 0 5px 0; color:var(--danger);">Teams Passed (यांनी माघार घेतली):</h4>
                 <p id="globalPassedTeamsList" style="margin:0; font-weight:bold; color:#555;">None</p>
             </div>
 
@@ -176,9 +176,7 @@
       appId: "1:353231465465:web:e4ae774ca0fb91c4ee2b28"
     };
 
-    if (!firebase.apps.length) {
-        firebase.initializeApp(firebaseConfig);
-    }
+    if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
     const db = firebase.database();
 
     let currentRoomId = localStorage.getItem('ipl_roomId') || '';
@@ -195,17 +193,13 @@
 
     window.onload = () => {
         if(currentRoomId && myRole) {
-            document.body.setAttribute('data-role', myRole); // CSS Trigger
+            document.body.setAttribute('data-role', myRole); 
             startRoomListeners();
             if(myRole === 'user' && !myTeamId) {
                 document.getElementById('displayRoomName').innerText = "Current Room";
                 showPage('setupPage');
-            } else {
-                setupUI();
-            }
-        } else {
-            loadRoomList();
-        }
+            } else { setupUI(); }
+        } else { loadRoomList(); }
     };
 
     function logout() {
@@ -224,9 +218,7 @@
                                 <span style="font-size:12px; background:var(--dark); color:white; padding:3px 6px; border-radius:4px;">Join</span>
                              </div>`;
                 });
-            } else {
-                html = '<p>No active rooms found.</p>';
-            }
+            } else { html = '<p>No active rooms found.</p>'; }
             document.getElementById('roomListDiv').innerHTML = html;
         });
     }
@@ -314,14 +306,10 @@
         if(myTeamId && !skipTeam) {
             document.getElementById('myBiddingSection').style.display = 'block';
             document.getElementById('biddingAsName').innerText = myTeamName;
-        } else {
-            document.getElementById('myBiddingSection').style.display = 'none';
-        }
-        
+        } else { document.getElementById('myBiddingSection').style.display = 'none'; }
         showPage('livePage');
     }
 
-    // --- TEAM CREATION / LOGIN ---
     function createMyTeam() {
         let name = document.getElementById('tName').value.trim();
         let purse = parseFloat(document.getElementById('tPurse').value);
@@ -349,9 +337,7 @@
             localStorage.setItem('ipl_teamId', myTeamId);
             localStorage.setItem('ipl_teamName', myTeamName);
             setupUI();
-        } else {
-            alert("Wrong Team Password!");
-        }
+        } else { alert("Wrong Team Password!"); }
     }
 
     function updateTeamDropdowns() {
@@ -360,7 +346,6 @@
         if(document.getElementById('existingTeamSelect')) document.getElementById('existingTeamSelect').innerHTML = opts;
     }
 
-    // --- MASTER DATA ---
     function addPlayerToMaster() {
         let name = document.getElementById('pName').value.trim();
         let role = document.getElementById('pRole').value;
@@ -402,7 +387,6 @@
         getRef('liveAuction').set({ playerId: p.id, price: p.base, bidder: 'Base Price', lastBidTime: Date.now(), passedTeams: null });
     }
 
-    // --- LIVE AUCTION DISPLAY & LOGIC ---
     function updateLiveScreen() {
         if(liveState.playerId) {
             let p = masterPlayers.find(x => x.id == liveState.playerId);
@@ -457,6 +441,7 @@
         }, 200);
     }
 
+    // 🔥 SMART BIDDING RULES LOGIC 🔥
     function updateBiddingRules() {
         let totalTeams = teams.length;
         let passedCount = liveState.passedTeams ? Object.keys(liveState.passedTeams).length : 0;
@@ -466,27 +451,44 @@
             let btnPass = document.getElementById('btnPassBid');
             let msg = document.getElementById('passStatusMsg');
 
+            // Reset visibility
+            btnBid.style.display = 'block'; 
+            btnPass.style.display = 'block'; 
+            msg.style.display = 'none';
+
             if(liveState.passedTeams && liveState.passedTeams[myTeamId]) {
-                btnBid.style.display = 'none'; btnPass.style.display = 'none'; msg.style.display = 'block';
+                // Scenario: User has Passed
+                btnBid.style.display = 'none'; 
+                btnPass.style.display = 'none'; 
+                msg.style.display = 'block';
+            } else if(liveState.bidder === myTeamName) {
+                // Scenario: User is Highest Bidder (Cannot Pass!)
+                btnBid.disabled = true; 
+                btnBid.innerText = "🏆 You are Highest Bidder";
+                btnPass.style.display = 'none'; // <-- HIDDEN for highest bidder
             } else {
-                btnBid.style.display = 'block'; btnPass.style.display = 'block'; msg.style.display = 'none';
+                // Scenario: Normal User
+                btnBid.disabled = false;
+                btnBid.innerText = "🔥 PLACE BID (+)";
             }
-            if(liveState.bidder === myTeamName) { btnBid.disabled = true; } else { btnBid.disabled = false; }
         }
 
+        // Admin 'Force Stop / Unsold' Logic
         if(myRole === 'admin') {
             let btnSold = document.getElementById('adminBtnSold');
             let btnUnsold = document.getElementById('adminBtnUnsold');
             
             if(liveState.playerId) {
                 if(liveState.bidder === 'None' || liveState.bidder === 'Base Price') {
+                    // Everyone passed without bidding -> Show UNSOLD
                     if(passedCount >= totalTeams && totalTeams > 0) {
                         btnUnsold.style.display = 'block'; btnSold.style.display = 'none';
                     } else {
                         btnUnsold.style.display = 'none'; btnSold.style.display = 'none';
                     }
                 } else {
-                    // Force Stop Logic: If everyone else passed, allow immediate Sell
+                    // Someone placed a bid. Highest bidder CANNOT pass. 
+                    // So we only need (Total Teams - 1) passes to Force Sell.
                     if(passedCount >= totalTeams - 1 && totalTeams > 1) {
                         btnSold.style.display = 'block'; btnUnsold.style.display = 'none';
                     } else if(totalTeams === 1) {
@@ -594,7 +596,6 @@
                                <table><thead><tr><th>#</th><th>Player</th><th>Price</th><th>Act</th></tr></thead><tbody>${rows}</tbody></table></div>`;
         });
 
-        // Toggle visibility for purse input based on role
         if (myRole === 'admin') {
             document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'block');
             document.querySelectorAll('.user-purse-display').forEach(el => el.style.display = 'none');
