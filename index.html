@@ -32,9 +32,10 @@
         .badge { padding: 4px 8px; border-radius: 4px; font-size: 12px; color: white; font-weight: bold; }
         .WK { background: #e63946; } .Batter { background: #457b9d; } .Bowler { background: #1d3557; } .AR { background: #fb8500; }
         
-        /* Admin Visibility Fixes */
+        /* 100% WORKING ADMIN VISIBILITY FIX */
         .admin-only { display: none !important; }
         body[data-role="admin"] .admin-only { display: block !important; }
+        body[data-role="admin"] span.admin-only { display: inline-block !important; }
         body[data-role="admin"] th.admin-only, 
         body[data-role="admin"] td.admin-only { display: table-cell !important; }
         body[data-role="admin"] div.admin-only { display: flex !important; }
@@ -85,7 +86,7 @@
         <input type="password" id="tPassLogin" placeholder="Enter Team Password">
         <button onclick="loginToTeam()" style="background:var(--dark); color:white; border:none; padding:12px; border-radius:5px; width:100%; font-weight:bold;">LOGIN TO TEAM</button>
         
-        <button class="admin-only" onclick="setupUI(true)" style="background:#6c757d; color:white; border:none; padding:12px; border-radius:5px; width:100%; font-weight:bold; margin-top:20px; display:block;">SKIP (Admin Control Only - No Team)</button>
+        <button class="admin-only" onclick="setupUI(true)" style="background:#6c757d; color:white; border:none; padding:12px; border-radius:5px; width:100%; font-weight:bold; margin-top:20px;">SKIP (Admin Control Only - No Team)</button>
     </div>
 </div>
 
@@ -122,7 +123,7 @@
     <div id="livePage" class="page">
         <div class="card" style="text-align: center;">
             
-            <div class="admin-only" style="background: #e2e8f0; padding: 15px; border-radius: 8px; margin-bottom: 15px; display:block;">
+            <div class="admin-only" style="background: #e2e8f0; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
                 <h3 style="margin-top:0;">Admin Control (Select Player to Start Timer)</h3>
                 <select id="selectFromMaster" onchange="loadPlayerToAuction()"></select>
                 
@@ -161,7 +162,7 @@
 
     <div id="dashboardPage" class="page">
         <div id="teamSheetsContainer" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px;"></div>
-        <button class="admin-only" onclick="deleteCurrentRoom()" style="background: #333; color: white; padding: 10px; border: none; cursor: pointer; margin-top: 30px; width: 100%; display:block;">DELETE THIS ROOM</button>
+        <button class="admin-only" onclick="deleteCurrentRoom()" style="background: #333; color: white; padding: 10px; border: none; cursor: pointer; margin-top: 30px; width: 100%;">DELETE THIS ROOM</button>
     </div>
 </div>
 
@@ -441,7 +442,6 @@
         }, 200);
     }
 
-    // 🔥 SMART BIDDING RULES LOGIC 🔥
     function updateBiddingRules() {
         let totalTeams = teams.length;
         let passedCount = liveState.passedTeams ? Object.keys(liveState.passedTeams).length : 0;
@@ -451,44 +451,36 @@
             let btnPass = document.getElementById('btnPassBid');
             let msg = document.getElementById('passStatusMsg');
 
-            // Reset visibility
             btnBid.style.display = 'block'; 
             btnPass.style.display = 'block'; 
             msg.style.display = 'none';
 
             if(liveState.passedTeams && liveState.passedTeams[myTeamId]) {
-                // Scenario: User has Passed
                 btnBid.style.display = 'none'; 
                 btnPass.style.display = 'none'; 
                 msg.style.display = 'block';
             } else if(liveState.bidder === myTeamName) {
-                // Scenario: User is Highest Bidder (Cannot Pass!)
                 btnBid.disabled = true; 
                 btnBid.innerText = "🏆 You are Highest Bidder";
-                btnPass.style.display = 'none'; // <-- HIDDEN for highest bidder
+                btnPass.style.display = 'none'; 
             } else {
-                // Scenario: Normal User
                 btnBid.disabled = false;
                 btnBid.innerText = "🔥 PLACE BID (+)";
             }
         }
 
-        // Admin 'Force Stop / Unsold' Logic
         if(myRole === 'admin') {
             let btnSold = document.getElementById('adminBtnSold');
             let btnUnsold = document.getElementById('adminBtnUnsold');
             
             if(liveState.playerId) {
                 if(liveState.bidder === 'None' || liveState.bidder === 'Base Price') {
-                    // Everyone passed without bidding -> Show UNSOLD
                     if(passedCount >= totalTeams && totalTeams > 0) {
                         btnUnsold.style.display = 'block'; btnSold.style.display = 'none';
                     } else {
                         btnUnsold.style.display = 'none'; btnSold.style.display = 'none';
                     }
                 } else {
-                    // Someone placed a bid. Highest bidder CANNOT pass. 
-                    // So we only need (Total Teams - 1) passes to Force Sell.
                     if(passedCount >= totalTeams - 1 && totalTeams > 1) {
                         btnSold.style.display = 'block'; btnUnsold.style.display = 'none';
                     } else if(totalTeams === 1) {
@@ -539,7 +531,6 @@
         if(myRole === 'admin') document.getElementById('selectFromMaster').value = "";
     }
 
-    // --- DASHBOARD / TEAM SHEETS ---
     function updateManualPurse(teamId) {
         if(myRole !== 'admin') return;
         let newPurse = document.getElementById('purse_' + teamId).value;
@@ -549,7 +540,7 @@
     }
     
     function removeSoldPlayerDirectly(teamId, pIndex, playerId) {
-        if(myRole === 'admin' && confirm("Approve Drop Request? (Purse refund will NOT happen automatically. Update purse manually if needed.)")) {
+        if(myRole === 'admin' && confirm("Remove this player? (Purse refund will NOT happen automatically. Update purse manually if needed.)")) {
             let t = teams.find(x => x.id === teamId);
             let pList = t.players || [];
             pList.splice(pIndex, 1);
@@ -577,8 +568,12 @@
                 let act = '-';
                 if(p) {
                     if(myRole === 'admin') {
-                        if (p.dropReq) { act = `<button onclick="removeSoldPlayerDirectly('${t.id}',${i},'${p.id}')" style="background:var(--danger); color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; font-weight:bold;">Approve Cut</button>`; } 
-                        else { act = `<span style="color:#888; font-size:12px;">No Req</span>`; }
+                        // Admin can cut ANY player from ANY team
+                        if (p.dropReq) { 
+                            act = `<button onclick="removeSoldPlayerDirectly('${t.id}',${i},'${p.id}')" style="background:var(--warning); color:#000; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; font-weight:bold;">Approve Cut</button>`; 
+                        } else { 
+                            act = `<button onclick="removeSoldPlayerDirectly('${t.id}',${i},'${p.id}')" style="background:var(--danger); color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; font-weight:bold;">Cut</button>`; 
+                        }
                     } else if(myTeamId === t.id) {
                         act = p.dropReq ? `<span style="color:var(--warning);">Requested</span>` : `<button onclick="requestDropPlayer('${t.id}',${i})" style="background:var(--warning); color:white; border:none; padding:2px 5px; cursor:pointer;">Drop Req</button>`;
                     }
@@ -596,8 +591,8 @@
                                <table><thead><tr><th>#</th><th>Player</th><th>Price</th><th>Act</th></tr></thead><tbody>${rows}</tbody></table></div>`;
         });
 
+        // Toggle UI based on Role
         if (myRole === 'admin') {
-            document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'block');
             document.querySelectorAll('.user-purse-display').forEach(el => el.style.display = 'none');
         } else {
             document.querySelectorAll('.user-purse-display').forEach(el => el.style.display = 'inline-block');
