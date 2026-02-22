@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IPL Pro Auction - Auto Sold & Admin Bid</title>
+    <title>IPL Pro Auction - Fair Play</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
@@ -25,13 +25,15 @@
         th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
         th { background: var(--dark); color: var(--gold); }
         .row-highlight { background-color: #e2e8f0 !important; font-weight: bold; }
-        .bid-btn { background: var(--gold); color: var(--dark); border: none; padding: 20px; font-size: 24px; font-weight: bold; border-radius: 10px; cursor: pointer; width: 100%; margin-top: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.2);}
-        .bid-btn:active { transform: scale(0.98); }
+        
+        .bid-btn { background: var(--gold); color: var(--dark); border: none; padding: 20px; font-size: 20px; font-weight: bold; border-radius: 10px; cursor: pointer; width: 100%; margin-bottom: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.2);}
+        .pass-btn { background: var(--danger); color: white; border: none; padding: 15px; font-size: 18px; font-weight: bold; border-radius: 10px; cursor: pointer; width: 100%; box-shadow: 0 4px 6px rgba(0,0,0,0.2);}
+        
+        .bid-btn:active, .pass-btn:active { transform: scale(0.98); }
         .badge { padding: 4px 8px; border-radius: 4px; font-size: 12px; color: white; font-weight: bold; }
         .WK { background: #e63946; } .Batter { background: #457b9d; } .Bowler { background: #1d3557; } .AR { background: #fb8500; }
         
         .admin-only { display: none; }
-        .user-only { display: none; }
         
         @media (max-width: 600px) {
             #auctionDisplay h1 { font-size: 30px !important; }
@@ -52,12 +54,12 @@
 <div id="setupPage" class="page" style="text-align:center; padding-top: 20px;">
     <div class="card" style="max-width: 600px; margin: auto;" id="createTeamDiv">
         <h2>Create Your Team</h2>
-        <p>तुमची टीम बनवा आणि लिलावात सामील व्हा!</p>
+        <p>तुम्ही कोण आहात? तुमची टीम बनवा!</p>
         <input type="text" id="tName" placeholder="Enter Your Team Name">
         <input type="number" id="tPurse" placeholder="Total Purse (Cr) e.g. 100" value="100">
         <button onclick="createMyTeam()" style="background:var(--success); color:white; border:none; padding:15px; border-radius:5px; width:100%; font-size: 18px; font-weight:bold; margin-bottom:10px;">CREATE TEAM & JOIN</button>
         
-        <button class="admin-only" onclick="enterAuction()" style="background:#6c757d; color:white; border:none; padding:10px; border-radius:5px; width:100%;">SKIP TEAM CREATION (Enter as Admin only)</button>
+        <button class="admin-only" onclick="enterAuctionWithoutTeam()" style="background:#6c757d; color:white; border:none; padding:10px; border-radius:5px; width:100%;">SKIP (Admin Only View)</button>
     </div>
     
     <div class="card" style="max-width: 600px; margin: auto; display:none;" id="readyDiv">
@@ -107,15 +109,15 @@
             <div class="admin-only" style="background: #e2e8f0; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
                 <h3 style="margin-top:0;">Admin Control</h3>
                 <select id="selectFromMaster" onchange="loadPlayerToAuction()"></select>
-                <div style="display:flex; gap:10px; margin-top:10px;">
-                    <button onclick="autoSellPlayer()" style="background: var(--success); color: white; padding: 15px; border: none; border-radius: 5px; flex:1; font-weight:bold; font-size:18px;">✅ SOLD (To Highest Bidder)</button>
-                    <button onclick="markUnsold()" style="background: var(--danger); color: white; padding: 15px; border: none; border-radius: 5px; flex:1; font-weight:bold; font-size:18px;">❌ UNSOLD</button>
-                </div>
                 
-                <div style="margin-top:15px; background:#d4edda; padding:10px; border-radius:5px; border: 2px solid #28a745;">
-                    <h4 style="margin:5px 0;">Admin Proxy Bid (तुमची किंवा दुसऱ्याची बोली लावा)</h4>
-                    <select id="adminBidTeamSelect" style="width:100%; margin-bottom:10px;"></select>
-                    <button onclick="adminPlaceBid()" style="background:#28a745; color:white; padding:10px; width:100%; border:none; border-radius:5px; font-size:18px; font-weight:bold; cursor:pointer;">🔥 ADMIN BID (+)</button>
+                <div style="background:#fff; padding:10px; border-radius:5px; margin-top:10px; border: 1px solid #ccc;">
+                    <h4 style="margin:0 0 5px 0; color:var(--danger);">Teams Passed (यांनी माघार घेतली):</h4>
+                    <p id="adminPassedTeamsList" style="margin:0; font-weight:bold; color:#555;">None</p>
+                </div>
+
+                <div style="display:flex; gap:10px; margin-top:10px;">
+                    <button onclick="autoSellPlayer()" style="background: var(--success); color: white; padding: 15px; border: none; border-radius: 5px; flex:1; font-weight:bold; font-size:18px;">✅ SOLD (To Highest)</button>
+                    <button onclick="markUnsold()" style="background: var(--danger); color: white; padding: 15px; border: none; border-radius: 5px; flex:1; font-weight:bold; font-size:18px;">❌ UNSOLD</button>
                 </div>
             </div>
 
@@ -126,9 +128,12 @@
                 <p style="color: #fff; font-size: 18px; margin-top: 5px;">Highest Bidder: <span id="highestBidderLabel" style="color: #4cc9f0; font-weight:bold;">None</span></p>
             </div>
             
-            <div class="user-only" style="margin-top: 20px;">
-                <button class="bid-btn" onclick="placeBid()">🔥 PLACE BID (+)</button>
-                <p style="margin-top:5px; font-weight:bold; color:var(--blue);">Bidding as: <span id="biddingAsName">-</span></p>
+            <div id="myBiddingSection" style="margin-top: 20px; display:none;">
+                <p style="margin-top:0; font-weight:bold; color:var(--blue);">Bidding as: <span id="biddingAsName" style="font-size:20px;">-</span></p>
+                <div style="display:flex; gap:10px; flex-direction:column;">
+                    <button class="bid-btn" onclick="placeBid()">🔥 PLACE BID (+)</button>
+                    <button class="pass-btn" onclick="passBid()">❌ PASS (No Bid)</button>
+                </div>
             </div>
         </div>
     </div>
@@ -158,7 +163,7 @@
     let myTeamName = '';
     let teams = [];
     let masterPlayers = [];
-    let liveState = { playerId: null, price: 0, bidder: 'None' };
+    let liveState = { playerId: null, price: 0, bidder: 'None', passedTeams: {} };
 
     // --- ADMIN LOCK SYSTEM ---
     function requestAdmin() {
@@ -177,18 +182,16 @@
     function setupRole(role) {
         myRole = role;
         document.getElementById('rolePage').style.display = 'none';
-        document.getElementById('setupPage').style.display = 'block'; // Show setup to everyone
+        document.getElementById('setupPage').style.display = 'block';
         
         if(role === 'admin') {
             document.querySelectorAll('.admin-only').forEach(el => el.style.display = el.tagName === 'TH' ? 'table-cell' : 'block');
-            document.querySelectorAll('.user-only').forEach(el => el.style.display = 'none');
         } else {
             document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
-            document.querySelectorAll('.user-only').forEach(el => el.style.display = 'block');
         }
     }
 
-    // --- USER/ADMIN TEAM CREATION ---
+    // --- TEAM CREATION ---
     function createMyTeam() {
         let name = document.getElementById('tName').value.trim();
         let purse = parseFloat(document.getElementById('tPurse').value);
@@ -203,9 +206,13 @@
         document.getElementById('readyDiv').style.display = 'block';
         document.getElementById('myTeamDisplay').innerText = name + " (" + purse + " Cr)";
         
-        if(myRole === 'user') {
-            document.getElementById('biddingAsName').innerText = name;
-        }
+        document.getElementById('biddingAsName').innerText = name;
+        document.getElementById('myBiddingSection').style.display = 'block'; // Show bid buttons
+    }
+
+    function enterAuctionWithoutTeam() {
+        document.getElementById('myBiddingSection').style.display = 'none'; // Admin without team cannot bid
+        enterAuction();
     }
 
     function enterAuction() {
@@ -225,7 +232,6 @@
     db.ref('teams').on('value', (snapshot) => {
         let data = snapshot.val();
         teams = data ? Object.values(data) : [];
-        if(myRole === 'admin') updateAdminTeamDropdown();
         renderTeamSheets();
     });
 
@@ -240,6 +246,8 @@
         let data = snapshot.val();
         if(data) {
             liveState = data;
+            
+            // Update live display
             if(liveState.playerId) {
                 let p = masterPlayers.find(x => x.id == liveState.playerId);
                 if(p) {
@@ -253,6 +261,15 @@
                 document.getElementById('liveDispInfo').innerText = "-";
                 document.getElementById('currentBidLabel').innerText = "0.00";
                 document.getElementById('highestBidderLabel').innerText = "None";
+            }
+
+            // Update Admin's Pass List
+            if(myRole === 'admin') {
+                let passedStr = "None";
+                if(liveState.passedTeams) {
+                    passedStr = Object.values(liveState.passedTeams).join(", ");
+                }
+                document.getElementById('adminPassedTeamsList').innerText = passedStr;
             }
         }
     });
@@ -282,12 +299,6 @@
 
     function deletePlayer(id) { if(confirm("Delete Player completely?")) db.ref('players/' + id).remove(); }
 
-    function updateAdminTeamDropdown() {
-        let opts = '<option value="">-- Select Team for Admin Bid --</option>';
-        teams.forEach(t => opts += `<option value="${t.id}">${t.name} (Purse: ${t.currentPurse.toFixed(2)} Cr)</option>`);
-        document.getElementById('adminBidTeamSelect').innerHTML = opts;
-    }
-
     function updateAdminPlayerSelect() {
         let mSel = document.getElementById('selectFromMaster');
         mSel.innerHTML = '<option value="">-- Select Player for Live Screen --</option>';
@@ -300,43 +311,49 @@
 
     function loadPlayerToAuction() {
         let pId = document.getElementById('selectFromMaster').value;
-        if(pId === "") { db.ref('liveAuction').set({ playerId: null, price: 0, bidder: 'None' }); return; }
+        if(pId === "") { 
+            db.ref('liveAuction').set({ playerId: null, price: 0, bidder: 'None', passedTeams: null }); 
+            return; 
+        }
         let p = masterPlayers.find(x => x.id === pId);
-        db.ref('liveAuction').set({ playerId: p.id, price: p.base, bidder: 'Base Price' });
+        // Clear passed teams on new player
+        db.ref('liveAuction').set({ playerId: p.id, price: p.base, bidder: 'Base Price', passedTeams: null });
     }
 
-    // Process a Bid (used by both user and admin functions)
-    function processBidCore(teamName, teamId, teamPurse) {
+    // Bid 
+    function placeBid() {
+        if(!myTeamId) return alert("You don't have a team!");
         if(!liveState.playerId) return alert("Auction not active!");
-        if(liveState.bidder === teamName) return alert(teamName + " ची बोली आधीच सर्वात मोठी आहे! (Already highest bidder)");
+        if(liveState.bidder === myTeamName) return alert("तुमचीच बोली सर्वात मोठी आहे!");
+
+        let team = teams.find(t => t.id === myTeamId);
+        if(!team) return;
 
         let currentPrice = liveState.price;
         let inc = (currentPrice >= 20) ? 1.0 : (currentPrice >= 10 ? 0.5 : 0.25);
         let newPrice = currentPrice + inc;
 
-        if(teamPurse < newPrice) return alert("Not enough budget!");
+        if(team.currentPurse < newPrice) return alert("Not enough budget!");
 
-        db.ref('liveAuction').update({ price: newPrice, bidder: teamName });
+        // If team bids, remove them from 'Passed' list just in case they change their mind
+        if(liveState.passedTeams && liveState.passedTeams[myTeamId]) {
+            db.ref('liveAuction/passedTeams/' + myTeamId).remove();
+        }
+
+        db.ref('liveAuction').update({ price: newPrice, bidder: team.name });
     }
 
-    // Normal User Place Bid 
-    function placeBid() {
-        if(!myTeamId) return alert("You don't have a team!");
-        let team = teams.find(t => t.id === myTeamId);
-        if(!team) return;
-        processBidCore(team.name, team.id, team.currentPurse);
+    // Pass (No Bid)
+    function passBid() {
+        if(!myTeamId) return;
+        if(!liveState.playerId) return;
+        
+        // Add team to passed list in Firebase
+        db.ref('liveAuction/passedTeams/' + myTeamId).set(myTeamName);
+        alert("तुम्ही माघार घेतली आहे. (Admin has been notified)");
     }
 
-    // Admin Place Bid (Proxy)
-    function adminPlaceBid() {
-        let tId = document.getElementById('adminBidTeamSelect').value;
-        if(!tId) return alert("Please select a team from the dropdown above to bid!");
-        let team = teams.find(t => t.id === tId);
-        if(!team) return;
-        processBidCore(team.name, team.id, team.currentPurse);
-    }
-
-    // Auto Sell to Highest Bidder
+    // Auto Sell
     function autoSellPlayer() {
         if(!liveState.playerId) return alert("Select Player first!");
         
@@ -358,7 +375,7 @@
         
         db.ref('teams/' + team.id).update({ currentPurse: updatedPurse, players: playerList });
         db.ref('players/' + p.id).update({ status: 'SOLD' });
-        db.ref('liveAuction').set({ playerId: null, price: 0, bidder: 'SOLD to ' + team.name });
+        db.ref('liveAuction').set({ playerId: null, price: 0, bidder: 'SOLD to ' + team.name, passedTeams: null });
         
         document.getElementById('selectFromMaster').value = "";
         alert(p.name + " Sold to " + team.name + " for " + liveState.price + " Cr!");
@@ -367,11 +384,11 @@
     function markUnsold() {
         if(!liveState.playerId) return;
         db.ref('players/' + liveState.playerId).update({ status: 'UNSOLD' });
-        db.ref('liveAuction').set({ playerId: null, price: 0, bidder: 'UNSOLD' });
+        db.ref('liveAuction').set({ playerId: null, price: 0, bidder: 'UNSOLD', passedTeams: null });
         document.getElementById('selectFromMaster').value = "";
     }
 
-    // Admin Action: Undo Sold Player
+    // Undo Sold Player
     function removeSoldPlayer(teamId, pIndex, playerId, price) {
         if(myRole !== 'admin') return;
         if(!confirm("या खेळाडूला टीममधून काढायचे आहे का? (पैसे परत मिळतील)")) return;
@@ -414,5 +431,3 @@
 </script>
 </body>
 </html>
-
-        
