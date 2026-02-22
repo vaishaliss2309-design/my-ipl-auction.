@@ -26,7 +26,8 @@
         th { background: var(--dark); color: var(--gold); }
         
         .bid-btn { background: var(--gold); color: var(--dark); border: none; padding: 15px; font-size: 20px; font-weight: bold; border-radius: 8px; cursor: pointer; width: 100%; margin-bottom: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.2);}
-        .bid-btn:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: none; }
+        .pass-btn { background: var(--danger); color: white; border: none; padding: 15px; font-size: 18px; font-weight: bold; border-radius: 8px; cursor: pointer; width: 100%; box-shadow: 0 4px 6px rgba(0,0,0,0.2);}
+        .bid-btn:disabled, .pass-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
         
         .badge { padding: 4px 8px; border-radius: 4px; font-size: 12px; color: white; font-weight: bold; }
         .WK { background: #e63946; } .Batter { background: #457b9d; } .Bowler { background: #1d3557; } .AR { background: #fb8500; }
@@ -118,6 +119,11 @@
             <div class="admin-only" style="background: #e2e8f0; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
                 <h3 style="margin-top:0;">Admin Control (Select Player to Start Timer)</h3>
                 <select id="selectFromMaster" onchange="loadPlayerToAuction()"></select>
+                
+                <div style="display:flex; gap:10px; margin-top:15px;">
+                    <button id="adminBtnSold" onclick="autoSellPlayer()" style="background: var(--success); color: white; padding: 15px; border: none; border-radius: 5px; flex:1; font-weight:bold; font-size:16px; display:none;">✅ Force SELL</button>
+                    <button id="adminBtnUnsold" onclick="markUnsold()" style="background: var(--danger); color: white; padding: 15px; border: none; border-radius: 5px; flex:1; font-weight:bold; font-size:16px; display:none;">❌ UNSOLD</button>
+                </div>
             </div>
 
             <div id="auctionDisplay" style="background: var(--dark); color: var(--gold); padding: 30px 10px; border-radius: 15px; border: 3px solid var(--gold);">
@@ -130,10 +136,19 @@
                     ⏳ Waiting...
                 </div>
             </div>
+            
+            <div style="background:#fff; padding:10px; border-radius:5px; margin-top:15px; border: 2px solid #ccc;">
+                <h4 style="margin:0 0 5px 0; color:var(--danger);">Teams Passed:</h4>
+                <p id="globalPassedTeamsList" style="margin:0; font-weight:bold; color:#555;">None</p>
+            </div>
 
             <div id="myBiddingSection" style="margin-top: 20px; display:none;">
                 <p style="margin-top:0; font-weight:bold; color:var(--blue);">Bidding as: <span id="biddingAsName" style="font-size:20px;">-</span></p>
-                <button id="btnPlaceBid" class="bid-btn" onclick="placeBid()">🔥 PLACE BID (+)</button>
+                <div style="display:flex; gap:10px; flex-direction:column;">
+                    <button id="btnPlaceBid" class="bid-btn" onclick="placeBid()">🔥 PLACE BID (+)</button>
+                    <button id="btnPassBid" class="pass-btn" onclick="passBid()">❌ PASS (No Bid)</button>
+                </div>
+                <p id="passStatusMsg" style="display:none; color:var(--danger); font-weight:bold; margin-top:10px;">तुम्ही या खेळाडूसाठी माघार घेतली आहे.</p>
             </div>
         </div>
     </div>
@@ -169,7 +184,7 @@
 
     let teams = [];
     let masterPlayers = [];
-    let liveState = { playerId: null, price: 0, bidder: 'None', lastBidTime: null };
+    let liveState = { playerId: null, price: 0, bidder: 'None', lastBidTime: null, passedTeams: null };
     let auctionTimerInterval;
 
     const getRef = (path) => db.ref('rooms/' + currentRoomId + '/' + path);
@@ -277,6 +292,7 @@
             teams = snap.val() ? Object.values(snap.val()) : [];
             updateTeamDropdowns();
             renderTeamSheets();
+            updateBiddingRules();
         });
 
         getRef('players').on('value', snap => {
@@ -286,10 +302,10 @@
         });
 
         getRef('liveAuction').on('value', snap => {
-            liveState = snap.val() || { playerId: null, price: 0, bidder: 'None', lastBidTime: null };
+            liveState = snap.val() || { playerId: null, price: 0, bidder: 'None', lastBidTime: null, passedTeams: null };
             updateLiveScreen();
             updateBiddingRules();
-            startLocalTimer(); // Trigger timer update
+            startLocalTimer(); 
         });
     }
 
@@ -391,11 +407,10 @@
 
     function loadPlayerToAuction() {
         let pId = document.getElementById('selectFromMaster').value;
-        if(pId === "") { getRef('liveAuction').set({ playerId: null, price: 0, bidder: 'None', lastBidTime: null }); return; }
+        if(pId === "") { getRef('liveAuction').set({ playerId: null, price: 0, bidder: 'None', lastBidTime: null, passedTeams: null }); return; }
         
         let p = masterPlayers.find(x => x.id === pId);
-        // Set lastBidTime immediately so the timer starts instantly for Base Price
-        getRef('liveAuction').set({ playerId: p.id, price: p.base, bidder: 'Base Price', lastBidTime: Date.now() });
+        getRef('liveAuction').set({ playerId: p.id, price: p.base, bidder: 'Base Price', lastBidTime: Date.now(), passedTeams: null });
     }
 
     // --- LIVE AUCTION DISPLAY & LOGIC ---
@@ -415,9 +430,13 @@
             document.getElementById('highestBidderLabel').innerText = "None";
             document.getElementById('timerDisplay').style.display = 'none';
         }
+
+        let passedStr = "None";
+        if(liveState.passedTeams) { passedStr = Object.values(liveState.passedTeams).join(", "); }
+        document.getElementById('globalPassedTeamsList').innerText = passedStr;
     }
 
-    // 💡 AUTO TIMER LOGIC (1 Min starts immediately)
+    // 💡 AUTO TIMER LOGIC 
     function startLocalTimer() {
         clearInterval(auctionTimerInterval);
         
@@ -432,21 +451,17 @@
             timerDiv.style.display = 'block';
 
             if(elapsed < 3000) {
-                // पहिले 3 सेकंद Wait
                 timerDiv.innerHTML = "⏳ Waiting... (" + Math.ceil((3000 - elapsed)/1000) + "s)";
                 timerDiv.style.color = "var(--warning)";
             } else if (elapsed < 63000) {
-                // 3 सेकंदानंतर 60 सेकंदांचा टायमर (Total 63 sec)
                 let timeLeft = Math.ceil((63000 - elapsed) / 1000);
                 timerDiv.innerHTML = "⏱️ Time Left: " + timeLeft + "s";
-                timerDiv.style.color = "#ff4d4d"; // Red
+                timerDiv.style.color = "#ff4d4d"; 
             } else {
-                // टायमर संपला
                 timerDiv.innerHTML = "🔨 Time UP!";
                 timerDiv.style.color = "var(--success)";
                 clearInterval(auctionTimerInterval);
                 
-                // फक्त ॲडमिनच्या सिस्टममधून Auto-sell/Unsold फंक्शन कॉल होईल
                 if(myRole === 'admin') {
                     if (liveState.bidder === 'Base Price' || liveState.bidder === 'None') {
                         markUnsold();
@@ -459,9 +474,45 @@
     }
 
     function updateBiddingRules() {
+        let totalTeams = teams.length;
+        let passedCount = liveState.passedTeams ? Object.keys(liveState.passedTeams).length : 0;
+
         if(myTeamId && liveState.playerId) {
             let btnBid = document.getElementById('btnPlaceBid');
+            let btnPass = document.getElementById('btnPassBid');
+            let msg = document.getElementById('passStatusMsg');
+
+            if(liveState.passedTeams && liveState.passedTeams[myTeamId]) {
+                btnBid.style.display = 'none'; btnPass.style.display = 'none'; msg.style.display = 'block';
+            } else {
+                btnBid.style.display = 'block'; btnPass.style.display = 'block'; msg.style.display = 'none';
+            }
             if(liveState.bidder === myTeamName) { btnBid.disabled = true; } else { btnBid.disabled = false; }
+        }
+
+        if(myRole === 'admin') {
+            let btnSold = document.getElementById('adminBtnSold');
+            let btnUnsold = document.getElementById('adminBtnUnsold');
+            
+            if(liveState.playerId) {
+                if(liveState.bidder === 'None' || liveState.bidder === 'Base Price') {
+                    if(passedCount >= totalTeams && totalTeams > 0) {
+                        btnUnsold.style.display = 'block'; btnSold.style.display = 'none';
+                    } else {
+                        btnUnsold.style.display = 'none'; btnSold.style.display = 'none';
+                    }
+                } else {
+                    if(passedCount >= totalTeams - 1 && totalTeams > 1) {
+                        btnSold.style.display = 'block'; btnUnsold.style.display = 'none';
+                    } else if(totalTeams === 1) {
+                        btnSold.style.display = 'block'; btnUnsold.style.display = 'none';
+                    } else {
+                        btnSold.style.display = 'none'; btnUnsold.style.display = 'none';
+                    }
+                }
+            } else {
+                btnSold.style.display = 'none'; btnUnsold.style.display = 'none';
+            }
         }
     }
 
@@ -474,8 +525,12 @@
 
         if(team.currentPurse < newPrice) return alert("Not enough budget!");
 
-        // जेव्हा नवीन बिड लागते, तेव्हा lastBidTime अपडेट होतो, ज्यामुळे टायमर परत रिसेट होतो
-        getRef('liveAuction').update({ price: newPrice, bidder: team.name, lastBidTime: Date.now() });
+        getRef('liveAuction').update({ price: newPrice, bidder: team.name, lastBidTime: Date.now(), passedTeams: null });
+    }
+
+    function passBid() {
+        if(!myTeamId || !liveState.playerId) return;
+        getRef('liveAuction/passedTeams/' + myTeamId).set(myTeamName);
     }
 
     function autoSellPlayer() {
@@ -490,7 +545,7 @@
         
         getRef('teams/' + team.id).update({ currentPurse: updatedPurse, players: playerList });
         getRef('players/' + p.id).update({ status: 'SOLD' });
-        getRef('liveAuction').set({ playerId: null, price: 0, bidder: 'SOLD to ' + team.name, lastBidTime: null });
+        getRef('liveAuction').set({ playerId: null, price: 0, bidder: 'SOLD to ' + team.name, lastBidTime: null, passedTeams: null });
         
         if(myRole === 'admin') document.getElementById('selectFromMaster').value = "";
     }
@@ -498,7 +553,7 @@
     function markUnsold() {
         if(!liveState.playerId) return;
         getRef('players/' + liveState.playerId).update({ status: 'UNSOLD' });
-        getRef('liveAuction').set({ playerId: null, price: 0, bidder: 'UNSOLD', lastBidTime: null });
+        getRef('liveAuction').set({ playerId: null, price: 0, bidder: 'UNSOLD', lastBidTime: null, passedTeams: null });
         if(myRole === 'admin') document.getElementById('selectFromMaster').value = "";
     }
 
@@ -512,7 +567,7 @@
     }
     
     function removeSoldPlayerDirectly(teamId, pIndex, playerId) {
-        if(myRole === 'admin' && confirm("Admin: Remove this player from team? (Purse refund will NOT happen automatically. Update purse manually if needed.)")) {
+        if(myRole === 'admin' && confirm("Approve Drop Request? (Purse refund will NOT happen automatically. Update purse manually if needed.)")) {
             let t = teams.find(x => x.id === teamId);
             let pList = t.players || [];
             pList.splice(pIndex, 1);
@@ -540,9 +595,11 @@
                 let act = '-';
                 if(p) {
                     if(myRole === 'admin') {
-                        // Admin can cut anyone directly
-                        act = `<button onclick="removeSoldPlayerDirectly('${t.id}',${i},'${p.id}')" style="background:var(--danger); color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; font-weight:bold;">Cut</button>`;
-                        if(p.dropReq) act += ` <span style="color:var(--danger); font-size:10px;">(Drop Req)</span>`;
+                        if (p.dropReq) {
+                            act = `<button onclick="removeSoldPlayerDirectly('${t.id}',${i},'${p.id}')" style="background:var(--danger); color:white; border:none; padding:4px 8px; border-radius:4px; cursor:pointer; font-weight:bold;">Approve Cut</button>`;
+                        } else {
+                            act = `<span style="color:#888; font-size:12px;">No Req</span>`;
+                        }
                     } else if(myTeamId === t.id) {
                         act = p.dropReq ? `<span style="color:var(--warning);">Requested</span>` : `<button onclick="requestDropPlayer('${t.id}',${i})" style="background:var(--warning); color:white; border:none; padding:2px 5px; cursor:pointer;">Drop Req</button>`;
                     }
@@ -550,7 +607,6 @@
                 rows += `<tr><td>${i+1}</td><td>${p?p.name:'-'}</td><td>${p?p.price.toFixed(2):'-'}</td><td>${act}</td></tr>`;
             }
             
-            // Explicit Save button for Purse
             let pInput = myRole === 'admin' ? 
                 `<input type="number" id="purse_${t.id}" value="${t.currentPurse.toFixed(2)}" style="width:100px; padding:4px;"> 
                  <button onclick="updateManualPurse('${t.id}')" style="background:var(--success); color:white; border:none; padding:6px; cursor:pointer; border-radius:4px;">Save</button>` 
