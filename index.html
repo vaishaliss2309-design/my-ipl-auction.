@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IPL Pro Auction - Super Live</title>
+    <title>IPL Pro Auction - Auto Sold & Admin Bid</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
@@ -52,10 +52,12 @@
 <div id="setupPage" class="page" style="text-align:center; padding-top: 20px;">
     <div class="card" style="max-width: 600px; margin: auto;" id="createTeamDiv">
         <h2>Create Your Team</h2>
-        <p>तुम्ही फक्त एकच टीम बनवू शकता.</p>
+        <p>तुमची टीम बनवा आणि लिलावात सामील व्हा!</p>
         <input type="text" id="tName" placeholder="Enter Your Team Name">
         <input type="number" id="tPurse" placeholder="Total Purse (Cr) e.g. 100" value="100">
-        <button onclick="createMyTeam()" style="background:var(--success); color:white; border:none; padding:15px; border-radius:5px; width:100%; font-size: 18px; font-weight:bold;">CREATE TEAM & JOIN</button>
+        <button onclick="createMyTeam()" style="background:var(--success); color:white; border:none; padding:15px; border-radius:5px; width:100%; font-size: 18px; font-weight:bold; margin-bottom:10px;">CREATE TEAM & JOIN</button>
+        
+        <button class="admin-only" onclick="enterAuction()" style="background:#6c757d; color:white; border:none; padding:10px; border-radius:5px; width:100%;">SKIP TEAM CREATION (Enter as Admin only)</button>
     </div>
     
     <div class="card" style="max-width: 600px; margin: auto; display:none;" id="readyDiv">
@@ -102,13 +104,18 @@
     <div id="livePage" class="page">
         <div class="card" style="text-align: center;">
             
-            <div class="admin-only" style="background: #e2e8f0; padding: 10px; border-radius: 8px; margin-bottom: 15px;">
-                <h3>Admin Control</h3>
+            <div class="admin-only" style="background: #e2e8f0; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                <h3 style="margin-top:0;">Admin Control</h3>
                 <select id="selectFromMaster" onchange="loadPlayerToAuction()"></select>
                 <div style="display:flex; gap:10px; margin-top:10px;">
-                    <select id="adminSellingTeam" style="flex:2;"></select>
-                    <button onclick="sellPlayer()" style="background: var(--success); color: white; padding: 10px; border: none; border-radius: 5px; flex:1;">SOLD</button>
-                    <button onclick="markUnsold()" style="background: var(--danger); color: white; padding: 10px; border: none; border-radius: 5px; flex:1;">UNSOLD</button>
+                    <button onclick="autoSellPlayer()" style="background: var(--success); color: white; padding: 15px; border: none; border-radius: 5px; flex:1; font-weight:bold; font-size:18px;">✅ SOLD (To Highest Bidder)</button>
+                    <button onclick="markUnsold()" style="background: var(--danger); color: white; padding: 15px; border: none; border-radius: 5px; flex:1; font-weight:bold; font-size:18px;">❌ UNSOLD</button>
+                </div>
+                
+                <div style="margin-top:15px; background:#d4edda; padding:10px; border-radius:5px; border: 2px solid #28a745;">
+                    <h4 style="margin:5px 0;">Admin Proxy Bid (तुमची किंवा दुसऱ्याची बोली लावा)</h4>
+                    <select id="adminBidTeamSelect" style="width:100%; margin-bottom:10px;"></select>
+                    <button onclick="adminPlaceBid()" style="background:#28a745; color:white; padding:10px; width:100%; border:none; border-radius:5px; font-size:18px; font-weight:bold; cursor:pointer;">🔥 ADMIN BID (+)</button>
                 </div>
             </div>
 
@@ -147,7 +154,7 @@
     const db = firebase.database();
 
     let myRole = ''; 
-    let myTeamId = ''; // Stores the ID of the single team created by this user
+    let myTeamId = ''; 
     let myTeamName = '';
     let teams = [];
     let masterPlayers = [];
@@ -161,7 +168,7 @@
                 alert("⚠️ दुसरा कोणीतरी आधीच Admin आहे! तुम्ही फक्त 'Team Owner' बनू शकता.");
             } else {
                 adminRef.set(true);
-                adminRef.onDisconnect().remove(); // Auto-unlocks if Admin closes app
+                adminRef.onDisconnect().remove(); 
                 setupRole('admin');
             }
         });
@@ -170,19 +177,18 @@
     function setupRole(role) {
         myRole = role;
         document.getElementById('rolePage').style.display = 'none';
+        document.getElementById('setupPage').style.display = 'block'; // Show setup to everyone
         
         if(role === 'admin') {
             document.querySelectorAll('.admin-only').forEach(el => el.style.display = el.tagName === 'TH' ? 'table-cell' : 'block');
             document.querySelectorAll('.user-only').forEach(el => el.style.display = 'none');
-            enterAuction(); // Admin goes straight in
         } else {
-            document.getElementById('setupPage').style.display = 'block';
             document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
             document.querySelectorAll('.user-only').forEach(el => el.style.display = 'block');
         }
     }
 
-    // --- USER TEAM CREATION ---
+    // --- USER/ADMIN TEAM CREATION ---
     function createMyTeam() {
         let name = document.getElementById('tName').value.trim();
         let purse = parseFloat(document.getElementById('tPurse').value);
@@ -191,17 +197,15 @@
         myTeamId = "T_" + Date.now();
         myTeamName = name;
         
-        db.ref('teams/' + myTeamId).set({
-            id: myTeamId,
-            name: name,
-            currentPurse: purse,
-            players: []
-        });
+        db.ref('teams/' + myTeamId).set({ id: myTeamId, name: name, currentPurse: purse, players: [] });
 
         document.getElementById('createTeamDiv').style.display = 'none';
         document.getElementById('readyDiv').style.display = 'block';
         document.getElementById('myTeamDisplay').innerText = name + " (" + purse + " Cr)";
-        document.getElementById('biddingAsName').innerText = name;
+        
+        if(myRole === 'user') {
+            document.getElementById('biddingAsName').innerText = name;
+        }
     }
 
     function enterAuction() {
@@ -279,9 +283,9 @@
     function deletePlayer(id) { if(confirm("Delete Player completely?")) db.ref('players/' + id).remove(); }
 
     function updateAdminTeamDropdown() {
-        let opts = '<option value="">-- Select Team --</option>';
+        let opts = '<option value="">-- Select Team for Admin Bid --</option>';
         teams.forEach(t => opts += `<option value="${t.id}">${t.name} (Purse: ${t.currentPurse.toFixed(2)} Cr)</option>`);
-        document.getElementById('adminSellingTeam').innerHTML = opts;
+        document.getElementById('adminBidTeamSelect').innerHTML = opts;
     }
 
     function updateAdminPlayerSelect() {
@@ -301,30 +305,49 @@
         db.ref('liveAuction').set({ playerId: p.id, price: p.base, bidder: 'Base Price' });
     }
 
-    // User Place Bid (Auto assigns to their single team)
-    function placeBid() {
+    // Process a Bid (used by both user and admin functions)
+    function processBidCore(teamName, teamId, teamPurse) {
         if(!liveState.playerId) return alert("Auction not active!");
-        if(!myTeamId) return alert("You don't have a team!");
-        
-        let team = teams.find(t => t.id === myTeamId);
-        if(!team) return alert("Team data error!");
-        
-        if(liveState.bidder === team.name) return alert("तुमचीच बोली सर्वात मोठी आहे! (You are already highest bidder)");
+        if(liveState.bidder === teamName) return alert(teamName + " ची बोली आधीच सर्वात मोठी आहे! (Already highest bidder)");
 
         let currentPrice = liveState.price;
         let inc = (currentPrice >= 20) ? 1.0 : (currentPrice >= 10 ? 0.5 : 0.25);
         let newPrice = currentPrice + inc;
 
-        if(team.currentPurse < newPrice) return alert("Not enough budget!");
+        if(teamPurse < newPrice) return alert("Not enough budget!");
 
-        db.ref('liveAuction').update({ price: newPrice, bidder: team.name });
+        db.ref('liveAuction').update({ price: newPrice, bidder: teamName });
     }
 
-    function sellPlayer() {
-        let tId = document.getElementById('adminSellingTeam').value;
-        if(!tId || !liveState.playerId) return alert("Select Player and Team!");
-        
+    // Normal User Place Bid 
+    function placeBid() {
+        if(!myTeamId) return alert("You don't have a team!");
+        let team = teams.find(t => t.id === myTeamId);
+        if(!team) return;
+        processBidCore(team.name, team.id, team.currentPurse);
+    }
+
+    // Admin Place Bid (Proxy)
+    function adminPlaceBid() {
+        let tId = document.getElementById('adminBidTeamSelect').value;
+        if(!tId) return alert("Please select a team from the dropdown above to bid!");
         let team = teams.find(t => t.id === tId);
+        if(!team) return;
+        processBidCore(team.name, team.id, team.currentPurse);
+    }
+
+    // Auto Sell to Highest Bidder
+    function autoSellPlayer() {
+        if(!liveState.playerId) return alert("Select Player first!");
+        
+        let highestBidderName = liveState.bidder;
+        if(highestBidderName === 'None' || highestBidderName === 'Base Price') {
+            return alert("अजून कोणीही बोली लावलेली नाही! (No bids yet)");
+        }
+
+        let team = teams.find(t => t.name === highestBidderName);
+        if(!team) return alert("Team Error!");
+
         let p = masterPlayers.find(x => x.id === liveState.playerId);
         
         if(team.currentPurse < liveState.price) return alert("Team doesn't have enough purse!");
@@ -338,6 +361,7 @@
         db.ref('liveAuction').set({ playerId: null, price: 0, bidder: 'SOLD to ' + team.name });
         
         document.getElementById('selectFromMaster').value = "";
+        alert(p.name + " Sold to " + team.name + " for " + liveState.price + " Cr!");
     }
 
     function markUnsold() {
@@ -356,12 +380,9 @@
         let newPurse = team.currentPurse + price;
         
         let pList = team.players || [];
-        pList.splice(pIndex, 1); // Remove from array
+        pList.splice(pIndex, 1);
 
-        // Update Team DB
         db.ref('teams/' + teamId).update({ currentPurse: newPurse, players: pList });
-        
-        // Update Player DB back to Available
         db.ref('players/' + playerId).update({ status: 'Available' });
     }
 
@@ -393,4 +414,5 @@
 </script>
 </body>
 </html>
+
         
