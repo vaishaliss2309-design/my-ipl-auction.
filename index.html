@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IPL Pro Auction - Rooms & Strict Rules</title>
+    <title>IPL Pro Auction - Complete Master</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
@@ -57,7 +57,7 @@
         <h2>Create Auction Room</h2>
         <input type="text" id="rName" placeholder="Room Name (e.g. IPL 2026)">
         <input type="password" id="rPass" placeholder="Set Room Password (For everyone)">
-        <button onclick="createRoom()" style="background:var(--success); color:white; border:none; padding:15px; border-radius:5px; width:100%; font-size: 18px; font-weight:bold; margin-bottom:10px;">Create & Enter as Admin</button>
+        <button onclick="createRoom()" style="background:var(--success); color:white; border:none; padding:15px; border-radius:5px; width:100%; font-size: 18px; font-weight:bold; margin-bottom:10px;">Create Room</button>
         <button onclick="showPage('mainMenuPage')" style="background:#ccc; padding:10px; width:100%; border:none; border-radius:5px;">Back</button>
     </div>
 </div>
@@ -78,6 +78,8 @@
         <select id="existingTeamSelect"><option value="">-- Select Your Team --</option></select>
         <input type="password" id="tPassLogin" placeholder="Enter Team Password">
         <button onclick="loginToTeam()" style="background:var(--dark); color:white; border:none; padding:12px; border-radius:5px; width:100%; font-weight:bold;">LOGIN TO TEAM</button>
+        
+        <button class="admin-only" onclick="setupUI(true)" style="background:#6c757d; color:white; border:none; padding:12px; border-radius:5px; width:100%; font-weight:bold; margin-top:20px;">SKIP (Admin Control Only - No Team)</button>
     </div>
 </div>
 
@@ -179,14 +181,19 @@
     let masterPlayers = [];
     let liveState = { playerId: null, price: 0, bidder: 'None', passedTeams: {} };
 
-    // Helper to get Room DB reference
     const getRef = (path) => db.ref('rooms/' + currentRoomId + '/' + path);
 
     // --- ON LOAD CHECK ---
     window.onload = () => {
         if(currentRoomId && myRole) {
             startRoomListeners();
-            setupUI();
+            // If they are strictly a user without a team, they should see setup page
+            if(myRole === 'user' && !myTeamId) {
+                document.getElementById('displayRoomName').innerText = "Current Room";
+                showPage('setupPage');
+            } else {
+                setupUI();
+            }
         } else {
             loadRoomList();
         }
@@ -229,8 +236,14 @@
         currentRoomId = rId;
         myRole = 'admin';
         
+        document.getElementById('mainMenuPage').style.display = 'none';
+        document.getElementById('displayRoomName').innerText = name;
+        
+        // Show the ".admin-only" elements on setup page (like the SKIP button)
+        document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'block');
+        
         startRoomListeners();
-        setupUI();
+        showPage('setupPage'); // Redirect Admin to Setup Page to create their team
     }
 
     function joinRoomPrompt(rId, rName, actualPass) {
@@ -241,10 +254,14 @@
             currentRoomId = rId;
             myRole = 'user';
             
+            document.getElementById('mainMenuPage').style.display = 'none';
             document.getElementById('displayRoomName').innerText = rName;
+            
+            // Hide admin elements for user
+            document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
+            
             startRoomListeners();
             
-            // Check if user already has a team saved locally
             if(myTeamId) {
                 setupUI();
             } else {
@@ -260,6 +277,7 @@
             teams = snap.val() ? Object.values(snap.val()) : [];
             updateTeamDropdowns();
             renderTeamSheets();
+            updateBiddingRules(); // Re-evaluate rules if team count changes
         });
 
         getRef('players').on('value', snap => {
@@ -275,21 +293,25 @@
         });
     }
 
-    function setupUI() {
+    function setupUI(skipTeam = false) {
         document.getElementById('mainMenuPage').style.display = 'none';
         document.getElementById('setupPage').style.display = 'none';
         document.getElementById('mainNav').style.display = 'flex';
         
         if(myRole === 'admin') {
             document.querySelectorAll('.admin-only').forEach(el => el.style.display = el.tagName === 'TH' ? 'table-cell' : 'block');
-            document.getElementById('myBiddingSection').style.display = 'none';
         } else {
             document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'none');
-            if(myTeamId) {
-                document.getElementById('myBiddingSection').style.display = 'block';
-                document.getElementById('biddingAsName').innerText = myTeamName;
-            }
         }
+        
+        // Show Bidding Section for BOTH Admin and User if they created a team
+        if(myTeamId && !skipTeam) {
+            document.getElementById('myBiddingSection').style.display = 'block';
+            document.getElementById('biddingAsName').innerText = myTeamName;
+        } else {
+            document.getElementById('myBiddingSection').style.display = 'none';
+        }
+        
         showPage('livePage');
     }
 
@@ -405,8 +427,8 @@
         let totalTeams = teams.length;
         let passedCount = liveState.passedTeams ? Object.keys(liveState.passedTeams).length : 0;
         
-        // 1. User Button Restrictions
-        if(myRole === 'user' && myTeamId && liveState.playerId) {
+        // 1. User/Admin Bidding Button Restrictions
+        if(myTeamId && liveState.playerId) {
             let btnBid = document.getElementById('btnPlaceBid');
             let btnPass = document.getElementById('btnPassBid');
             let msg = document.getElementById('passStatusMsg');
