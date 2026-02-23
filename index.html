@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IPL Pro Auction - Chat & 11 Players</title>
+    <title>IPL Pro Auction - Advanced Security</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
@@ -36,7 +36,6 @@
         .room-item { background: #e2e8f0; padding: 15px; border-radius: 8px; margin-bottom: 10px; cursor: pointer; border-left: 5px solid var(--blue); display:flex; justify-content:space-between; align-items:center; font-weight:bold;}
         .room-item:hover { background: #cbd5e1; }
         
-        /* TOAST NOTIFICATION CSS */
         #toast {
             visibility: hidden; min-width: 250px; background-color: rgba(0, 29, 61, 0.95); color: #fff;
             text-align: center; border-radius: 8px; padding: 16px; position: fixed; border: 2px solid var(--gold);
@@ -47,9 +46,7 @@
         @keyframes fadein { from {top: -50px; opacity: 0;} to {top: 20px; opacity: 1;} }
         @keyframes fadeout { from {top: 20px; opacity: 1;} to {top: -50px; opacity: 0;} }
 
-        @media (max-width: 600px) { 
-            #auctionDisplay h1 { font-size: 26px !important; } 
-        }
+        @media (max-width: 600px) { #auctionDisplay h1 { font-size: 26px !important; } }
     </style>
 </head>
 <body>
@@ -70,8 +67,13 @@
     <div class="card" style="max-width: 500px; margin: auto;">
         <h2>Create Auction Room</h2>
         <input type="text" id="rName" placeholder="Room Name (e.g. IPL 2026)">
-        <input type="password" id="rPass" placeholder="Set Room Password (For everyone)">
-        <button onclick="createRoom()" style="background:var(--success); color:white; border:none; padding:15px; border-radius:5px; width:100%; font-size: 18px; font-weight:bold; margin-bottom:10px;">Create Room</button>
+        <p style="text-align:left; margin-bottom:5px; font-weight:bold; color:var(--danger); font-size:14px;">तुमचा ॲडमिन पासवर्ड (Admin Password):</p>
+        <input type="password" id="rAdminPass" placeholder="Set ADMIN Password (तुमच्यासाठी)">
+        
+        <p style="text-align:left; margin-bottom:5px; font-weight:bold; color:var(--blue); font-size:14px;">मित्रांचा पासवर्ड (User Password):</p>
+        <input type="password" id="rPass" placeholder="Set USER Password (मित्रांसाठी)">
+        
+        <button onclick="createRoom()" style="background:var(--success); color:white; border:none; padding:15px; border-radius:5px; width:100%; font-size: 18px; font-weight:bold; margin-bottom:10px; margin-top:10px;">Create Room</button>
         <button onclick="showPage('mainMenuPage')" style="background:#ccc; padding:10px; width:100%; border:none; border-radius:5px;">Back</button>
     </div>
 </div>
@@ -177,8 +179,7 @@
     <div id="chatPage" class="page">
         <div class="card" style="display:flex; flex-direction:column; height: 65vh;">
             <h2 style="margin-top:0;">💬 Global Chat</h2>
-            <div id="chatHistory" style="flex:1; overflow-y:auto; border:1px solid #ccc; padding:15px; border-radius:8px; margin-bottom:15px; background:#f1f5f9; text-align:left;">
-                </div>
+            <div id="chatHistory" style="flex:1; overflow-y:auto; border:1px solid #ccc; padding:15px; border-radius:8px; margin-bottom:15px; background:#f1f5f9; text-align:left;"></div>
             <div style="display:flex; gap:10px;">
                 <input type="text" id="chatInputPage" placeholder="Type a message..." style="margin:0; flex:1;" onkeypress="if(event.key === 'Enter') sendChatMessage()">
                 <button onclick="sendChatMessage()" style="background:var(--blue); color:white; border:none; padding:10px 20px; border-radius:5px; font-weight:bold; cursor:pointer;">Send</button>
@@ -241,7 +242,9 @@
             let data = snap.val();
             if(data) {
                 Object.keys(data).forEach(id => {
-                    html += `<div class="room-item" onclick="joinRoomPrompt('${id}', '${data[id].config.name}', '${data[id].config.password}')">
+                    // Safety check if old room data doesn't have adminPassword
+                    let aPass = data[id].config.adminPassword || data[id].config.password;
+                    html += `<div class="room-item" onclick="joinRoomPrompt('${id}', '${data[id].config.name}', '${data[id].config.password}', '${aPass}')">
                                 <span>🏠 ${data[id].config.name}</span>
                                 <span style="font-size:12px; background:var(--dark); color:white; padding:3px 6px; border-radius:4px;">Join</span>
                              </div>`;
@@ -255,11 +258,13 @@
 
     function createRoom() {
         let name = document.getElementById('rName').value.trim();
-        let pass = document.getElementById('rPass').value.trim();
-        if(!name || !pass) return alert("Please enter Name and Password!");
+        let adminPass = document.getElementById('rAdminPass').value.trim();
+        let userPass = document.getElementById('rPass').value.trim();
+        
+        if(!name || !adminPass || !userPass) return alert("Please fill all fields!");
         
         let rId = "Room_" + Date.now();
-        db.ref('rooms/' + rId + '/config').set({ name: name, password: pass });
+        db.ref('rooms/' + rId + '/config').set({ name: name, password: userPass, adminPassword: adminPass });
         
         localStorage.setItem('ipl_roomId', rId);
         localStorage.setItem('ipl_role', 'admin');
@@ -267,16 +272,32 @@
         myRole = 'admin';
         
         document.getElementById('mainMenuPage').style.display = 'none';
-        document.getElementById('displayRoomName').innerText = name;
+        document.getElementById('displayRoomName').innerText = name + " (Admin)";
         document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'block');
         
         startRoomListeners();
         showPage('setupPage'); 
     }
 
-    function joinRoomPrompt(rId, rName, actualPass) {
+    function joinRoomPrompt(rId, rName, userPass, adminPass) {
         let inputPass = prompt("Enter Password for Room: " + rName);
-        if(inputPass === actualPass) {
+        
+        if(inputPass === adminPass) {
+            // Logged in as ADMIN
+            localStorage.setItem('ipl_roomId', rId);
+            localStorage.setItem('ipl_role', 'admin');
+            currentRoomId = rId;
+            myRole = 'admin';
+            
+            document.getElementById('mainMenuPage').style.display = 'none';
+            document.getElementById('displayRoomName').innerText = rName + " (Admin)";
+            document.querySelectorAll('.admin-only').forEach(el => el.style.display = 'block');
+            
+            startRoomListeners();
+            if(myTeamId) setupUI(); else showPage('setupPage');
+            
+        } else if(inputPass === userPass) {
+            // Logged in as USER
             localStorage.setItem('ipl_roomId', rId);
             localStorage.setItem('ipl_role', 'user');
             currentRoomId = rId;
@@ -288,8 +309,9 @@
             
             startRoomListeners();
             if(myTeamId) setupUI(); else showPage('setupPage');
+            
         } else if(inputPass !== null) {
-            alert("Incorrect Room Password!");
+            alert("Incorrect Password!");
         }
     }
 
@@ -328,7 +350,7 @@
             document.getElementById('onlineCount').innerText = count;
         });
 
-        // Chat Listener (Permanent on Page + Toast)
+        // Chat Listener
         getRef('chat').on('child_added', snap => {
             let data = snap.val();
             if(data) {
@@ -337,9 +359,8 @@
                     <strong style="color:var(--blue);">${data.sender}:</strong> 
                     <span style="font-size:16px;">${data.text}</span>
                 </div>`;
-                chatHist.scrollTop = chatHist.scrollHeight; // Auto scroll to bottom
+                chatHist.scrollTop = chatHist.scrollHeight; 
                 
-                // Show toast ONLY if the message arrived after page load
                 if(data.time >= pageLoadTime) {
                     showToast(data.sender + ": " + data.text);
                 }
@@ -424,7 +445,6 @@
         if(document.getElementById('existingTeamSelect')) document.getElementById('existingTeamSelect').innerHTML = opts;
     }
 
-    // --- MASTER DATA & NUMBERING ---
     function addPlayerToMaster() {
         let name = document.getElementById('pName').value.trim();
         let role = document.getElementById('pRole').value;
@@ -467,7 +487,6 @@
         getRef('liveAuction').set({ playerId: p.id, price: p.base, bidder: 'Base Price', passedTeams: null });
     }
 
-    // --- LIVE AUCTION ---
     function updateLiveScreen() {
         if(liveState.playerId) {
             let p = masterPlayers.find(x => x.id == liveState.playerId);
@@ -548,7 +567,6 @@
         let team = teams.find(t => t.name === liveState.bidder);
         let p = masterPlayers.find(x => x.id === liveState.playerId);
         
-        // Block if team already has 11 players
         if(team.players && team.players.length >= 11) {
             alert("या टीममध्ये आधीच ११ खेळाडू पूर्ण झाले आहेत!");
             return;
@@ -571,7 +589,6 @@
         document.getElementById('selectFromMaster').value = "";
     }
 
-    // --- DASHBOARD / TEAM SHEETS (11 Players) ---
     function updateManualPurse(teamId, newPurse) {
         if(myRole !== 'admin') return;
         if(confirm("Change team purse?")) getRef('teams/' + teamId).update({ currentPurse: parseFloat(newPurse) });
@@ -600,7 +617,6 @@
         teams.forEach(t => {
             let plist = t.players || [];
             let rows = '';
-            // Exactly 11 rows per team
             for(let i=0; i<11; i++) {
                 let p = plist[i];
                 let act = '-';
